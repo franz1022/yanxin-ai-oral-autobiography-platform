@@ -1,0 +1,38 @@
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+
+# Virtual environment
+.venv/
+venv/
+
+# VS Code
+.vscode/
+
+# Operating system
+.DS_Store
+Thumbs.db
+
+# User-uploaded private materials
+data/uploads/*
+!data/uploads/.gitkeep
+
+# Local databases
+*.db
+*.sqlite
+*.sqlite3
+
+# Generated outputs
+outputs/*
+!outputs/.gitkeep
+
+# Environment variables and API keys
+.env
+.streamlit/secrets.toml
+
+# Logs
+*.log
+logs/
+.env.*
+.idea/
