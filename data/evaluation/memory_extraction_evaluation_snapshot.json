@@ -1,0 +1,115 @@
+{
+  "metadata": {
+    "evaluation_role": "portfolio_snapshot",
+    "frozen_rule_commit": "0169ccd",
+    "evaluated_git_head": "1f9a7abd552685a16c8eca710e48f33a9cb831cb",
+    "holdout_dataset_sha256": "6bab95361b099280fa994ddca6cf2b13f265f11e5399feca5a5a36d4794cb47e",
+    "one_shot_protocol": true,
+    "do_not_tune_on_holdout": true,
+    "benchmarks_use_fictional_data": true
+  },
+  "development_baseline": {
+    "cases": 24,
+    "core_field_micro_accuracy": 95.0,
+    "core_complete_record_accuracy": 75.0,
+    "all_field_micro_accuracy": 90.1,
+    "language_detection_accuracy": 100.0,
+    "human_review_flag_rate": 100.0
+  },
+  "development_optimized": {
+    "cases": 24,
+    "core_field_micro_accuracy": 100.0,
+    "core_complete_record_accuracy": 100.0,
+    "all_field_micro_accuracy": 100.0,
+    "language_detection_accuracy": 100.0,
+    "human_review_flag_rate": 100.0
+  },
+  "holdout": {
+    "cases": 20,
+    "core_field_micro_accuracy": 91.0,
+    "core_complete_record_accuracy": 55.0,
+    "all_field_micro_accuracy": 86.87,
+    "language_detection_accuracy": 100.0,
+    "human_review_flag_rate": 100.0
+  },
+  "field_metrics": [
+    {
+      "field": "Detected language",
+      "field_group": "Supporting",
+      "development_accuracy": 100.0,
+      "holdout_accuracy": 100.0,
+      "holdout_wrong_value_count": 0
+    },
+    {
+      "field": "Event title",
+      "field_group": "Supporting",
+      "development_accuracy": 100.0,
+      "holdout_accuracy": 40.0,
+      "holdout_wrong_value_count": 12
+    },
+    {
+      "field": "Date certainty",
+      "field_group": "Supporting",
+      "development_accuracy": 100.0,
+      "holdout_accuracy": 100.0,
+      "holdout_wrong_value_count": 0
+    },
+    {
+      "field": "Start year",
+      "field_group": "Core",
+      "development_accuracy": 100.0,
+      "holdout_accuracy": 100.0,
+      "holdout_wrong_value_count": 0
+    },
+    {
+      "field": "End year",
+      "field_group": "Core",
+      "development_accuracy": 100.0,
+      "holdout_accuracy": 100.0,
+      "holdout_wrong_value_count": 0
+    },
+    {
+      "field": "Location",
+      "field_group": "Core",
+      "development_accuracy": 100.0,
+      "holdout_accuracy": 70.0,
+      "holdout_wrong_value_count": 6
+    },
+    {
+      "field": "People involved",
+      "field_group": "Core",
+      "development_accuracy": 100.0,
+      "holdout_accuracy": 90.0,
+      "holdout_wrong_value_count": 2
+    },
+    {
+      "field": "Emotional tone",
+      "field_group": "Core",
+      "development_accuracy": 100.0,
+      "holdout_accuracy": 95.0,
+      "holdout_wrong_value_count": 1
+    }
+  ],
+  "language_metrics": [
+    {
+      "language": "English",
+      "cases": 10,
+      "average_core_field_accuracy": 94.0,
+      "core_complete_record_accuracy": 70.0,
+      "average_all_field_accuracy": 88.75
+    },
+    {
+      "language": "Chinese",
+      "cases": 10,
+      "average_core_field_accuracy": 88.0,
+      "core_complete_record_accuracy": 40.0,
+      "average_all_field_accuracy": 85.0
+    }
+  ],
+  "interpretation": [
+    "Explicit year fields generalised reliably across the frozen holdout benchmark.",
+    "Event-title compression and location boundaries were the main remaining error sources.",
+    "Human review is a required product control before any extracted field is saved to the life timeline.",
+    "The English–Chinese difference is exploratory because each language group contains only 10 holdout cases."
+  ]
+}

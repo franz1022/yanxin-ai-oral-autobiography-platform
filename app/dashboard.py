@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import sys
 from pathlib import Path
 from typing import Any, Optional
@@ -9,6 +10,12 @@ import streamlit as st
 
 
 BASE_DIR = Path(__file__).resolve().parents[1]
+EVALUATION_SNAPSHOT_PATH = (
+    BASE_DIR
+    / "data"
+    / "evaluation"
+    / "memory_extraction_evaluation_snapshot.json"
+)
 
 if str(BASE_DIR) not in sys.path:
     sys.path.insert(0, str(BASE_DIR))
@@ -74,6 +81,31 @@ def dataframe_from_records(
 
 def year_or_none(enabled: bool, value: int) -> Optional[int]:
     return int(value) if enabled else None
+
+
+def load_evaluation_snapshot() -> Optional[dict[str, Any]]:
+    """Load the versioned evaluation snapshot used by the analytics tab."""
+    if not EVALUATION_SNAPSHOT_PATH.exists():
+        return None
+
+    try:
+        with EVALUATION_SNAPSHOT_PATH.open(
+            "r",
+            encoding="utf-8",
+        ) as snapshot_file:
+            snapshot = json.load(snapshot_file)
+    except (OSError, json.JSONDecodeError):
+        return None
+
+    return snapshot if isinstance(snapshot, dict) else None
+
+
+def percentage_label(value: object) -> str:
+    """Format a numeric evaluation value as a percentage label."""
+    try:
+        return f"{float(value):.2f}%"
+    except (TypeError, ValueError):
+        return "N/A"
 
 
 def get_selected_project() -> tuple[Optional[int], Optional[dict[str, Any]]]:
@@ -203,6 +235,7 @@ tabs = st.tabs(
         "Life Timeline",
         "Generate Content",
         "Review",
+        "Evaluation Analytics",
     ]
 )
 
@@ -1553,6 +1586,285 @@ with tabs[5]:
                 width="stretch",
                 hide_index=True,
             )
+
+
+
+with tabs[6]:
+    st.header("Memory Extraction Evaluation Analytics")
+
+    st.caption(
+        "Versioned results from fictional bilingual development and "
+        "frozen holdout benchmarks."
+    )
+
+    evaluation_snapshot = load_evaluation_snapshot()
+
+    if evaluation_snapshot is None:
+        st.warning(
+            "The evaluation snapshot is unavailable. Add "
+            "`data/evaluation/memory_extraction_evaluation_snapshot.json` "
+            "or regenerate the evaluation artefacts before using this page."
+        )
+    else:
+        metadata = evaluation_snapshot.get("metadata", {})
+        development_baseline = evaluation_snapshot.get(
+            "development_baseline",
+            {},
+        )
+        development_optimized = evaluation_snapshot.get(
+            "development_optimized",
+            {},
+        )
+        holdout = evaluation_snapshot.get("holdout", {})
+
+        st.info(
+            "The extraction rules were frozen before the one-shot holdout "
+            "evaluation. Holdout cases must not be used for further rule "
+            "tuning."
+        )
+
+        headline_cols = st.columns(4)
+        headline_cols[0].metric(
+            "Holdout Core-Field Accuracy",
+            percentage_label(
+                holdout.get("core_field_micro_accuracy")
+            ),
+        )
+        headline_cols[1].metric(
+            "Holdout Complete Records",
+            percentage_label(
+                holdout.get("core_complete_record_accuracy")
+            ),
+        )
+        headline_cols[2].metric(
+            "Holdout All-Field Accuracy",
+            percentage_label(
+                holdout.get("all_field_micro_accuracy")
+            ),
+        )
+        headline_cols[3].metric(
+            "Human-Review Flag Rate",
+            percentage_label(
+                holdout.get("human_review_flag_rate")
+            ),
+        )
+
+        st.subheader("Evaluation Stages")
+
+        stage_frame = pd.DataFrame(
+            [
+                {
+                    "Evaluation stage": "Development baseline",
+                    "Cases": development_baseline.get("cases"),
+                    "Core-field accuracy (%)": (
+                        development_baseline.get(
+                            "core_field_micro_accuracy"
+                        )
+                    ),
+                    "Complete-record accuracy (%)": (
+                        development_baseline.get(
+                            "core_complete_record_accuracy"
+                        )
+                    ),
+                    "All-field accuracy (%)": (
+                        development_baseline.get(
+                            "all_field_micro_accuracy"
+                        )
+                    ),
+                },
+                {
+                    "Evaluation stage": "Development after improvement",
+                    "Cases": development_optimized.get("cases"),
+                    "Core-field accuracy (%)": (
+                        development_optimized.get(
+                            "core_field_micro_accuracy"
+                        )
+                    ),
+                    "Complete-record accuracy (%)": (
+                        development_optimized.get(
+                            "core_complete_record_accuracy"
+                        )
+                    ),
+                    "All-field accuracy (%)": (
+                        development_optimized.get(
+                            "all_field_micro_accuracy"
+                        )
+                    ),
+                },
+                {
+                    "Evaluation stage": "Frozen one-shot holdout",
+                    "Cases": holdout.get("cases"),
+                    "Core-field accuracy (%)": (
+                        holdout.get("core_field_micro_accuracy")
+                    ),
+                    "Complete-record accuracy (%)": (
+                        holdout.get(
+                            "core_complete_record_accuracy"
+                        )
+                    ),
+                    "All-field accuracy (%)": (
+                        holdout.get("all_field_micro_accuracy")
+                    ),
+                },
+            ]
+        )
+
+        st.dataframe(
+            stage_frame,
+            width="stretch",
+            hide_index=True,
+        )
+
+        stage_chart = stage_frame.set_index(
+            "Evaluation stage"
+        )[
+            [
+                "Core-field accuracy (%)",
+                "Complete-record accuracy (%)",
+                "All-field accuracy (%)",
+            ]
+        ]
+        st.bar_chart(stage_chart, stack=False)
+
+        st.caption(
+            "The 100% development result was obtained after the development "
+            "cases had been used for error analysis. The frozen holdout "
+            "result is the independent generalisation estimate."
+        )
+
+        st.subheader("Field Accuracy")
+
+        field_frame = pd.DataFrame(
+            evaluation_snapshot.get("field_metrics", [])
+        )
+
+        if field_frame.empty:
+            st.info("No field-level metrics are available.")
+        else:
+            display_field_frame = field_frame.rename(
+                columns={
+                    "field": "Field",
+                    "field_group": "Group",
+                    "development_accuracy": (
+                        "Development accuracy (%)"
+                    ),
+                    "holdout_accuracy": "Holdout accuracy (%)",
+                    "holdout_wrong_value_count": (
+                        "Holdout wrong values"
+                    ),
+                }
+            )
+
+            st.dataframe(
+                display_field_frame,
+                width="stretch",
+                hide_index=True,
+            )
+
+            field_chart = display_field_frame.set_index(
+                "Field"
+            )[
+                [
+                    "Development accuracy (%)",
+                    "Holdout accuracy (%)",
+                ]
+            ]
+            st.bar_chart(field_chart, stack=False)
+
+            error_chart = display_field_frame.set_index(
+                "Field"
+            )[["Holdout wrong values"]]
+            st.subheader("Holdout Errors by Field")
+            st.bar_chart(error_chart)
+
+        st.subheader("Language Comparison")
+
+        language_frame = pd.DataFrame(
+            evaluation_snapshot.get("language_metrics", [])
+        )
+
+        if language_frame.empty:
+            st.info("No language-level metrics are available.")
+        else:
+            display_language_frame = language_frame.rename(
+                columns={
+                    "language": "Language",
+                    "cases": "Cases",
+                    "average_core_field_accuracy": (
+                        "Average core-field accuracy (%)"
+                    ),
+                    "core_complete_record_accuracy": (
+                        "Complete-record accuracy (%)"
+                    ),
+                    "average_all_field_accuracy": (
+                        "Average all-field accuracy (%)"
+                    ),
+                }
+            )
+
+            st.dataframe(
+                display_language_frame,
+                width="stretch",
+                hide_index=True,
+            )
+
+            language_chart = display_language_frame.set_index(
+                "Language"
+            )[
+                [
+                    "Average core-field accuracy (%)",
+                    "Complete-record accuracy (%)",
+                    "Average all-field accuracy (%)",
+                ]
+            ]
+            st.bar_chart(language_chart, stack=False)
+
+        st.subheader("Interpretation")
+
+        interpretation_points = evaluation_snapshot.get(
+            "interpretation",
+            [],
+        )
+
+        for point in interpretation_points:
+            st.markdown(f"- {point}")
+
+        with st.expander("Governance and reproducibility details"):
+            st.write(
+                f"**Frozen extraction-rule commit:** "
+                f"`{metadata.get('frozen_rule_commit', 'N/A')}`"
+            )
+            st.write(
+                f"**Evaluated Git HEAD:** "
+                f"`{metadata.get('evaluated_git_head', 'N/A')}`"
+            )
+            st.write(
+                f"**Holdout dataset SHA-256:** "
+                f"`{metadata.get('holdout_dataset_sha256', 'N/A')}`"
+            )
+            st.write(
+                f"**One-shot protocol:** "
+                f"{metadata.get('one_shot_protocol', False)}"
+            )
+            st.write(
+                f"**Do not tune on holdout:** "
+                f"{metadata.get('do_not_tune_on_holdout', False)}"
+            )
+            st.code(
+                """
+python -m scripts.evaluate_memory_extractor
+python -m scripts.test_memory_extractor_evaluation
+python -m scripts.test_memory_extractor_holdout
+python -m scripts.evaluate_memory_extractor_holdout
+                """.strip(),
+                language="powershell",
+            )
+
+        st.warning(
+            "All benchmark cases are fictional and the sample sizes are "
+            "small. These results describe a portfolio prototype and are "
+            "not a production-performance guarantee."
+        )
 
 
 st.divider()
