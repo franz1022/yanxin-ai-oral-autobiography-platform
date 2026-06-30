@@ -1,0 +1,340 @@
+{
+  "dataset_name": "Yanxin Memory Extraction Holdout Set",
+  "version": "1.0.0",
+  "evaluation_role": "holdout",
+  "description": "A privacy-safe, fully fictional bilingual holdout set created after the rule-based extractor was frozen at commit 0169ccd. It uses new wording and event combinations not copied from the development benchmark. Results should be reported once and should not be used for further rule tuning.",
+  "core_fields": [
+    "start_year",
+    "end_year",
+    "location",
+    "people_involved",
+    "emotional_tone"
+  ],
+  "supporting_fields": [
+    "detected_language",
+    "event_title",
+    "date_certainty"
+  ],
+  "cases": [
+    {
+      "case_id": "holdout_zh_001",
+      "language": "zh",
+      "difficulty": "medium",
+      "memory_text": "1984年，我和姐姐在杭州看烟花。那天我们特别开心。",
+      "expected": {
+        "detected_language": "zh",
+        "event_title": "与姐姐在杭州看烟花",
+        "start_year": 1984,
+        "end_year": null,
+        "date_certainty": "Estimated",
+        "location": "杭州",
+        "people_involved": "讲述者和姐姐",
+        "emotional_tone": "喜悦"
+      }
+    },
+    {
+      "case_id": "holdout_zh_002",
+      "language": "zh",
+      "difficulty": "medium",
+      "memory_text": "从1971年到1973年，我在南京读中学，和同学一起经历了不少困难。",
+      "expected": {
+        "detected_language": "zh",
+        "event_title": "在南京求学",
+        "start_year": 1971,
+        "end_year": 1973,
+        "date_certainty": "Estimated",
+        "location": "南京",
+        "people_involved": "讲述者和同学",
+        "emotional_tone": "艰难而沉思"
+      }
+    },
+    {
+      "case_id": "holdout_zh_003",
+      "language": "zh",
+      "difficulty": "hard",
+      "memory_text": "我常和外婆沿着苏州河边散步，现在想起来仍然觉得很温暖。",
+      "expected": {
+        "detected_language": "zh",
+        "event_title": "与外婆在河边散步",
+        "start_year": null,
+        "end_year": null,
+        "date_certainty": "Unknown",
+        "location": "苏州河边",
+        "people_involved": "讲述者和外婆",
+        "emotional_tone": "温暖而怀念"
+      }
+    },
+    {
+      "case_id": "holdout_zh_004",
+      "language": "zh",
+      "difficulty": "hard",
+      "memory_text": "2005年，我和丈夫在成都迎接女儿出生，全家人都非常高兴。",
+      "expected": {
+        "detected_language": "zh",
+        "event_title": "女儿出生",
+        "start_year": 2005,
+        "end_year": null,
+        "date_certainty": "Estimated",
+        "location": "成都",
+        "people_involved": "讲述者、丈夫、女儿",
+        "emotional_tone": "喜悦"
+      }
+    },
+    {
+      "case_id": "holdout_zh_005",
+      "language": "zh",
+      "difficulty": "medium",
+      "memory_text": "1993年，我从武汉来到珠海工作。日子虽然艰难，但我对新生活充满希望。",
+      "expected": {
+        "detected_language": "zh",
+        "event_title": "搬到珠海",
+        "start_year": 1993,
+        "end_year": null,
+        "date_certainty": "Estimated",
+        "location": "武汉 → 珠海",
+        "people_involved": null,
+        "emotional_tone": "艰难但充满希望"
+      }
+    },
+    {
+      "case_id": "holdout_zh_006",
+      "language": "zh",
+      "difficulty": "medium",
+      "memory_text": "1960年，我和弟弟在厦门海边玩耍，那是我很怀念的一段童年。",
+      "expected": {
+        "detected_language": "zh",
+        "event_title": "厦门海边的童年",
+        "start_year": 1960,
+        "end_year": null,
+        "date_certainty": "Estimated",
+        "location": "厦门海边",
+        "people_involved": "讲述者和弟弟",
+        "emotional_tone": "温暖而怀念"
+      }
+    },
+    {
+      "case_id": "holdout_zh_007",
+      "language": "zh",
+      "difficulty": "hard",
+      "memory_text": "2010年，我在北京工作时母亲去世了。那段时间我非常悲伤。",
+      "expected": {
+        "detected_language": "zh",
+        "event_title": "母亲离世",
+        "start_year": 2010,
+        "end_year": null,
+        "date_certainty": "Estimated",
+        "location": "北京",
+        "people_involved": "讲述者和母亲",
+        "emotional_tone": "悲伤而沉思"
+      }
+    },
+    {
+      "case_id": "holdout_zh_008",
+      "language": "zh",
+      "difficulty": "hard",
+      "memory_text": "我记得和奶奶在家乡的厨房里做饭，屋子里很暖，那些回忆至今很清晰。",
+      "expected": {
+        "detected_language": "zh",
+        "event_title": "和奶奶在厨房做饭",
+        "start_year": null,
+        "end_year": null,
+        "date_certainty": "Unknown",
+        "location": "家乡的厨房",
+        "people_involved": "讲述者和奶奶",
+        "emotional_tone": "温暖而怀念"
+      }
+    },
+    {
+      "case_id": "holdout_zh_009",
+      "language": "zh",
+      "difficulty": "easy",
+      "memory_text": "1988年，我在东莞开始第一份工作，朋友给了我很多鼓励，我对未来充满希望。",
+      "expected": {
+        "detected_language": "zh",
+        "event_title": "开始工作",
+        "start_year": 1988,
+        "end_year": null,
+        "date_certainty": "Estimated",
+        "location": "东莞",
+        "people_involved": "讲述者和朋友",
+        "emotional_tone": "充满希望"
+      }
+    },
+    {
+      "case_id": "holdout_zh_010",
+      "language": "zh",
+      "difficulty": "medium",
+      "memory_text": "1999年，我和妻子在佛山的一间小礼堂结婚，朋友们都来祝福我们。",
+      "expected": {
+        "detected_language": "zh",
+        "event_title": "结婚与家庭",
+        "start_year": 1999,
+        "end_year": null,
+        "date_certainty": "Estimated",
+        "location": "佛山的一间小礼堂",
+        "people_involved": "讲述者、妻子、朋友",
+        "emotional_tone": "平静而沉思"
+      }
+    },
+    {
+      "case_id": "holdout_en_001",
+      "language": "en",
+      "difficulty": "medium",
+      "memory_text": "In 1984, I watched fireworks in Hangzhou with my older sister. We were very happy.",
+      "expected": {
+        "detected_language": "en",
+        "event_title": "Watching Fireworks in Hangzhou",
+        "start_year": 1984,
+        "end_year": null,
+        "date_certainty": "Estimated",
+        "location": "Hangzhou",
+        "people_involved": "Storyteller and older sister",
+        "emotional_tone": "Joyful"
+      }
+    },
+    {
+      "case_id": "holdout_en_002",
+      "language": "en",
+      "difficulty": "medium",
+      "memory_text": "Between 1971 and 1973, I studied in Nanjing with my classmates during difficult years.",
+      "expected": {
+        "detected_language": "en",
+        "event_title": "Studying in Nanjing",
+        "start_year": 1971,
+        "end_year": 1973,
+        "date_certainty": "Estimated",
+        "location": "Nanjing",
+        "people_involved": "Storyteller and classmate",
+        "emotional_tone": "Difficult and reflective"
+      }
+    },
+    {
+      "case_id": "holdout_en_003",
+      "language": "en",
+      "difficulty": "hard",
+      "memory_text": "I often walked beside Suzhou Creek with my grandmother and still remember those warm afternoons.",
+      "expected": {
+        "detected_language": "en",
+        "event_title": "Walks by Suzhou Creek with My Grandmother",
+        "start_year": null,
+        "end_year": null,
+        "date_certainty": "Unknown",
+        "location": "Suzhou Creek",
+        "people_involved": "Storyteller and grandmother",
+        "emotional_tone": "Warm and nostalgic"
+      }
+    },
+    {
+      "case_id": "holdout_en_004",
+      "language": "en",
+      "difficulty": "hard",
+      "memory_text": "In 2005, my husband and I welcomed our daughter in Chengdu. Everyone was very happy.",
+      "expected": {
+        "detected_language": "en",
+        "event_title": "The Birth of My Daughter",
+        "start_year": 2005,
+        "end_year": null,
+        "date_certainty": "Estimated",
+        "location": "Chengdu",
+        "people_involved": "Storyteller, husband, daughter",
+        "emotional_tone": "Joyful"
+      }
+    },
+    {
+      "case_id": "holdout_en_005",
+      "language": "en",
+      "difficulty": "medium",
+      "memory_text": "In 1993, I relocated from Wuhan to Zhuhai because work was difficult, but I hoped for a new life.",
+      "expected": {
+        "detected_language": "en",
+        "event_title": "Moving to Zhuhai",
+        "start_year": 1993,
+        "end_year": null,
+        "date_certainty": "Estimated",
+        "location": "Wuhan → Zhuhai",
+        "people_involved": null,
+        "emotional_tone": "Difficult but hopeful"
+      }
+    },
+    {
+      "case_id": "holdout_en_006",
+      "language": "en",
+      "difficulty": "medium",
+      "memory_text": "In 1960, I played near the beach in Xiamen with my younger brother and remember it warmly.",
+      "expected": {
+        "detected_language": "en",
+        "event_title": "Childhood by the Beach in Xiamen",
+        "start_year": 1960,
+        "end_year": null,
+        "date_certainty": "Estimated",
+        "location": "Xiamen",
+        "people_involved": "Storyteller and younger brother",
+        "emotional_tone": "Warm and nostalgic"
+      }
+    },
+    {
+      "case_id": "holdout_en_007",
+      "language": "en",
+      "difficulty": "hard",
+      "memory_text": "In 2010, I was working in Beijing when my mother passed away. I felt deeply sad.",
+      "expected": {
+        "detected_language": "en",
+        "event_title": "Remembering My Mother",
+        "start_year": 2010,
+        "end_year": null,
+        "date_certainty": "Estimated",
+        "location": "Beijing",
+        "people_involved": "Storyteller and mother",
+        "emotional_tone": "Sad and reflective"
+      }
+    },
+    {
+      "case_id": "holdout_en_008",
+      "language": "en",
+      "difficulty": "hard",
+      "memory_text": "I remember cooking in the family kitchen with my grandmother. The room felt warm and familiar.",
+      "expected": {
+        "detected_language": "en",
+        "event_title": "Cooking with My Grandmother",
+        "start_year": null,
+        "end_year": null,
+        "date_certainty": "Unknown",
+        "location": "the family kitchen",
+        "people_involved": "Storyteller and grandmother",
+        "emotional_tone": "Warm and nostalgic"
+      }
+    },
+    {
+      "case_id": "holdout_en_009",
+      "language": "en",
+      "difficulty": "easy",
+      "memory_text": "In 1988, I began working at a factory in Dongguan with a friend. I felt hopeful about the future.",
+      "expected": {
+        "detected_language": "en",
+        "event_title": "Starting Work",
+        "start_year": 1988,
+        "end_year": null,
+        "date_certainty": "Estimated",
+        "location": "Dongguan",
+        "people_involved": "Storyteller and friend",
+        "emotional_tone": "Hopeful"
+      }
+    },
+    {
+      "case_id": "holdout_en_010",
+      "language": "en",
+      "difficulty": "medium",
+      "memory_text": "In 1999, my wife and I married at a small hall in Foshan. Our friends came to celebrate.",
+      "expected": {
+        "detected_language": "en",
+        "event_title": "Marriage and Family",
+        "start_year": 1999,
+        "end_year": null,
+        "date_certainty": "Estimated",
+        "location": "Foshan",
+        "people_involved": "Storyteller, wife, friend",
+        "emotional_tone": "Joyful"
+      }
+    }
+  ]
+}
