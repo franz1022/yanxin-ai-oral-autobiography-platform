@@ -10,6 +10,7 @@ REVIEW_WARNING = (
     "Human confirmation is required before the extracted fields are saved "
     "as a life event."
 )
+REVIEW_WARNING_ZH = "保存为人生事件前，必须由用户逐项确认提取结果。"
 
 
 @dataclass(frozen=True)
@@ -17,6 +18,7 @@ class MemoryExtractionResult:
     """Structured, reviewable fields extracted from one memory passage."""
 
     source_text: str
+    detected_language: str
     event_title: str
     start_year: Optional[int]
     end_year: Optional[int]
@@ -37,6 +39,18 @@ class MemoryExtractionResult:
 def normalise_text(text: str) -> str:
     """Collapse repeated whitespace while preserving readable punctuation."""
     return re.sub(r"\s+", " ", text or "").strip()
+
+
+def detect_language(text: str) -> str:
+    """Return ``zh`` for Chinese-dominant passages and ``en`` otherwise."""
+    source_text = normalise_text(text)
+    chinese_count = len(re.findall(r"[\u3400-\u4dbf\u4e00-\u9fff]", source_text))
+    latin_count = len(re.findall(r"[A-Za-z]", source_text))
+
+    if chinese_count >= 2 and chinese_count >= latin_count * 0.15:
+        return "zh"
+
+    return "en"
 
 
 def _first_years(text: str) -> list[int]:
@@ -66,26 +80,9 @@ def _extract_year_range(
     start_year = years[0]
     end_year = years[1] if len(years) > 1 else None
 
-    estimated_keywords = (
-        "around",
-        "about",
-        "approximately",
-        "roughly",
-        "circa",
-        "大约",
-        "大概",
-        "约",
-        "前后",
-        "左右",
-    )
-
-    certainty = (
-        "Estimated"
-        if any(keyword in text.lower() for keyword in estimated_keywords)
-        else "Estimated"
-    )
-
-    return start_year, end_year, certainty, "medium"
+    # The prototype treats years parsed from free-form memory text as
+    # estimated until the user explicitly confirms them in the review form.
+    return start_year, end_year, "Estimated", "medium"
 
 
 def _clean_extracted_phrase(value: str) -> str:
@@ -107,7 +104,7 @@ def _extract_location(
         return normalise_text(location_hint), "high"
 
     migration_cn = re.search(
-        r"从\s*([^，。；！？]{1,20}?)\s*(?:搬到|迁到|来到|去了)\s*"
+        r"从\s*([^，。；！？]{1,20}?)\s*(?:搬到|迁到|迁往|来到|去了)\s*"
         r"([^，。；！？]{1,20})",
         text,
     )
@@ -117,7 +114,7 @@ def _extract_location(
         return f"{origin} → {destination}", "medium"
 
     destination_cn = re.search(
-        r"(?:搬到|迁到|来到|去了)\s*([^，。；！？]{1,24})",
+        r"(?:搬到|迁到|迁往|来到|去了)\s*([^，。；！？]{1,24})",
         text,
     )
     if destination_cn:
@@ -125,7 +122,7 @@ def _extract_location(
 
     cn_matches = re.findall(
         r"在\s*([^，。；！？]{2,30}?)"
-        r"(?:生活|工作|学习|上学|出生|长大|度过|，|。)",
+        r"(?:生活|工作|学习|上学|出生|长大|度过|居住|，|。)",
         text,
     )
     if cn_matches:
@@ -171,15 +168,9 @@ def _extract_location(
         }[preposition]
         english_candidates.append((priority, candidate))
 
-        nested_in = re.search(
-            r"\bin\s+(.+)$",
-            candidate,
-            flags=re.IGNORECASE,
-        )
+        nested_in = re.search(r"\bin\s+(.+)$", candidate, flags=re.IGNORECASE)
         if nested_in:
-            nested_candidate = _clean_extracted_phrase(
-                nested_in.group(1)
-            )
+            nested_candidate = _clean_extracted_phrase(nested_in.group(1))
             if nested_candidate:
                 english_candidates.append((3, nested_candidate))
 
@@ -193,6 +184,7 @@ def _extract_location(
 def _extract_people(
     text: str,
     people_hint: Optional[str],
+    language: str,
 ) -> tuple[Optional[str], str]:
     if people_hint and people_hint.strip():
         return normalise_text(people_hint), "high"
@@ -200,187 +192,204 @@ def _extract_people(
     lower_text = text.lower()
 
     relation_terms = [
-        ("older brother", "older brother"),
-        ("younger brother", "younger brother"),
-        ("older sister", "older sister"),
-        ("younger sister", "younger sister"),
-        ("grandmother", "grandmother"),
-        ("grandfather", "grandfather"),
-        ("mother", "mother"),
-        ("father", "father"),
-        ("parents", "parents"),
-        ("wife", "wife"),
-        ("husband", "husband"),
-        ("daughter", "daughter"),
-        ("son", "son"),
-        ("teacher", "teacher"),
-        ("classmate", "classmate"),
-        ("friend", "friend"),
+        ("older brother", "older brother", "哥哥"),
+        ("younger brother", "younger brother", "弟弟"),
+        ("older sister", "older sister", "姐姐"),
+        ("younger sister", "younger sister", "妹妹"),
+        ("grandmother", "grandmother", "祖母或外祖母"),
+        ("grandfather", "grandfather", "祖父或外祖父"),
+        ("mother", "mother", "母亲"),
+        ("father", "father", "父亲"),
+        ("parents", "parents", "父母"),
+        ("wife", "wife", "妻子"),
+        ("husband", "husband", "丈夫"),
+        ("daughter", "daughter", "女儿"),
+        ("son", "son", "儿子"),
+        ("teacher", "teacher", "老师"),
+        ("classmate", "classmate", "同学"),
+        ("friend", "friend", "朋友"),
     ]
 
     chinese_terms = [
-        ("哥哥", "older brother"),
-        ("弟弟", "younger brother"),
-        ("姐姐", "older sister"),
-        ("妹妹", "younger sister"),
-        ("母亲", "mother"),
-        ("妈妈", "mother"),
-        ("父亲", "father"),
-        ("爸爸", "father"),
-        ("奶奶", "grandmother"),
-        ("外婆", "grandmother"),
-        ("爷爷", "grandfather"),
-        ("外公", "grandfather"),
-        ("妻子", "wife"),
-        ("丈夫", "husband"),
-        ("女儿", "daughter"),
-        ("儿子", "son"),
-        ("老师", "teacher"),
-        ("同学", "classmate"),
-        ("朋友", "friend"),
+        ("哥哥", "older brother", "哥哥"),
+        ("弟弟", "younger brother", "弟弟"),
+        ("姐姐", "older sister", "姐姐"),
+        ("妹妹", "younger sister", "妹妹"),
+        ("母亲", "mother", "母亲"),
+        ("妈妈", "mother", "母亲"),
+        ("父亲", "father", "父亲"),
+        ("爸爸", "father", "父亲"),
+        ("父母", "parents", "父母"),
+        ("奶奶", "grandmother", "奶奶"),
+        ("外婆", "grandmother", "外婆"),
+        ("爷爷", "grandfather", "爷爷"),
+        ("外公", "grandfather", "外公"),
+        ("妻子", "wife", "妻子"),
+        ("丈夫", "husband", "丈夫"),
+        ("女儿", "daughter", "女儿"),
+        ("儿子", "son", "儿子"),
+        ("老师", "teacher", "老师"),
+        ("同学", "classmate", "同学"),
+        ("朋友", "friend", "朋友"),
     ]
 
-    detected: list[str] = []
+    detected_en: list[str] = []
+    detected_zh: list[str] = []
 
-    for keyword, label in relation_terms:
-        if keyword in lower_text and label not in detected:
-            detected.append(label)
+    for keyword, label_en, label_zh in relation_terms:
+        if keyword in lower_text and label_en not in detected_en:
+            detected_en.append(label_en)
+            detected_zh.append(label_zh)
 
-    for keyword, label in chinese_terms:
-        if keyword in text and label not in detected:
-            detected.append(label)
+    for keyword, label_en, label_zh in chinese_terms:
+        if keyword in text and label_en not in detected_en:
+            detected_en.append(label_en)
+            detected_zh.append(label_zh)
 
-    if not detected:
+    if not detected_en:
         return None, "low"
 
-    if len(detected) == 1:
-        people = f"Storyteller and {detected[0]}"
-    else:
-        people = "Storyteller, " + ", ".join(detected)
+    if language == "zh":
+        if len(detected_zh) == 1:
+            return f"讲述者和{detected_zh[0]}", "medium"
+        return "讲述者、" + "、".join(detected_zh), "medium"
 
-    return people, "medium"
+    if len(detected_en) == 1:
+        return f"Storyteller and {detected_en[0]}", "medium"
+
+    return "Storyteller, " + ", ".join(detected_en), "medium"
+
+
+def _contains_any(text: str, lower_text: str, words: tuple[str, ...]) -> bool:
+    return any(word in lower_text or word in text for word in words)
 
 
 def _extract_emotional_tone(
     text: str,
     emotional_tone_hint: Optional[str],
+    language: str,
 ) -> tuple[str, str]:
     if emotional_tone_hint and emotional_tone_hint.strip():
         return normalise_text(emotional_tone_hint), "high"
 
     lower_text = text.lower()
 
-    hopeful = (
-        "hope",
-        "hopeful",
-        "new life",
-        "充满希望",
-        "希望",
-        "期待",
-    )
-    difficult = (
-        "difficult",
-        "hardship",
-        "hard",
-        "struggle",
-        "辛苦",
-        "困难",
-        "艰难",
-    )
-    warm = (
-        "warm",
-        "fondly",
-        "nostalgic",
-        "remember",
-        "childhood",
-        "温暖",
-        "怀念",
-        "童年",
-        "回忆",
-    )
-    joyful = (
-        "happy",
-        "joy",
-        "laughed",
-        "celebrated",
-        "开心",
-        "快乐",
-        "高兴",
-        "欢笑",
-    )
-    sad = (
-        "sad",
-        "loss",
-        "grief",
-        "missed",
-        "难过",
-        "悲伤",
-        "失去",
-        "离别",
-    )
+    hopeful = ("hope", "hopeful", "new life", "充满希望", "希望", "期待")
+    difficult = ("difficult", "hardship", "hard", "struggle", "辛苦", "困难", "艰难")
+    warm = ("warm", "fondly", "nostalgic", "remember", "childhood", "温暖", "怀念", "童年", "回忆")
+    joyful = ("happy", "joy", "laughed", "celebrated", "开心", "快乐", "高兴", "欢笑")
+    sad = ("sad", "loss", "grief", "missed", "难过", "悲伤", "失去", "离别")
 
-    has_hope = any(word in lower_text or word in text for word in hopeful)
-    has_difficulty = any(
-        word in lower_text or word in text
-        for word in difficult
-    )
+    has_hope = _contains_any(text, lower_text, hopeful)
+    has_difficulty = _contains_any(text, lower_text, difficult)
 
     if has_hope and has_difficulty:
-        return "Difficult but hopeful", "medium"
+        return (
+            "艰难但充满希望" if language == "zh" else "Difficult but hopeful",
+            "medium",
+        )
 
-    if any(word in lower_text or word in text for word in warm):
-        return "Warm and nostalgic", "medium"
+    if _contains_any(text, lower_text, warm):
+        return (
+            "温暖而怀念" if language == "zh" else "Warm and nostalgic",
+            "medium",
+        )
 
-    if any(word in lower_text or word in text for word in joyful):
-        return "Joyful", "medium"
+    if _contains_any(text, lower_text, joyful):
+        return ("喜悦" if language == "zh" else "Joyful", "medium")
 
-    if any(word in lower_text or word in text for word in sad):
-        return "Sad and reflective", "medium"
+    if _contains_any(text, lower_text, sad):
+        return (
+            "悲伤而沉思" if language == "zh" else "Sad and reflective",
+            "medium",
+        )
 
     if has_hope:
-        return "Hopeful", "medium"
+        return ("充满希望" if language == "zh" else "Hopeful", "medium")
 
     if has_difficulty:
-        return "Difficult and reflective", "medium"
+        return (
+            "艰难而沉思" if language == "zh" else "Difficult and reflective",
+            "medium",
+        )
 
-    return "Reflective", "low"
+    return ("平静而沉思" if language == "zh" else "Reflective", "low")
 
 
-def _extract_title(text: str, location: Optional[str]) -> tuple[str, str]:
+def _strip_chinese_time_prefix(text: str) -> str:
+    return re.sub(
+        r"^(?:大约|大概|约)?\s*(?:在)?\s*(?:18|19|20)\d{2}年?\s*[，,]?\s*",
+        "",
+        text,
+    ).strip()
+
+
+def _extract_title(
+    text: str,
+    location: Optional[str],
+    language: str,
+) -> tuple[str, str]:
     lower_text = text.lower()
 
     if (
-        ("school" in lower_text or "上学" in text or "学校" in text)
-        and ("walk" in lower_text or "走路" in text or "步行" in text)
+        ("school" in lower_text or "上学" in text or "学校" in text or "小学" in text)
+        and ("walk" in lower_text or "走路" in text or "步行" in text or "走着" in text)
     ):
+        if language == "zh":
+            return (
+                "步行去小学" if "primary school" in lower_text or "小学" in text else "步行去学校",
+                "high",
+            )
         if "primary school" in lower_text or "小学" in text:
             return "Walking to Primary School", "high"
         return "Walking to School", "high"
 
     if any(word in lower_text for word in ("moved", "move to", "relocated")) or any(
-        word in text for word in ("搬到", "迁到", "来到")
+        word in text for word in ("搬到", "迁到", "迁往", "来到")
     ):
         if location and "→" in location:
             destination = location.split("→", maxsplit=1)[1].strip()
-            return f"Moving to {destination}", "high"
+            return (
+                f"搬到{destination}" if language == "zh" else f"Moving to {destination}",
+                "high",
+            )
         if location:
-            return f"Moving to {location}", "medium"
-        return "Moving to a New Home", "medium"
+            return (
+                f"搬到{location}" if language == "zh" else f"Moving to {location}",
+                "medium",
+            )
+        return (
+            "搬到新家" if language == "zh" else "Moving to a New Home",
+            "medium",
+        )
 
     if any(word in lower_text for word in ("started work", "first job", "began working")) or any(
         word in text for word in ("参加工作", "第一份工作", "开始工作")
     ):
-        return "Starting Work", "high"
+        return ("开始工作" if language == "zh" else "Starting Work", "high")
 
     if any(word in lower_text for word in ("married", "wedding")) or any(
         word in text for word in ("结婚", "婚礼")
     ):
-        return "Marriage and Family", "high"
+        return ("结婚与家庭" if language == "zh" else "Marriage and Family", "high")
 
     if any(word in lower_text for word in ("was born", "birth")) or "出生" in text:
-        return "Birth and Early Family", "high"
+        return (
+            "出生与早年家庭" if language == "zh" else "Birth and Early Family",
+            "high",
+        )
 
     first_sentence = re.split(r"[.!?。！？]", text, maxsplit=1)[0]
+
+    if language == "zh":
+        first_sentence = _strip_chinese_time_prefix(first_sentence)
+        first_sentence = normalise_text(first_sentence)
+        if not first_sentence:
+            return "未命名回忆", "low"
+        if len(first_sentence) > 30:
+            first_sentence = first_sentence[:27].rstrip() + "..."
+        return first_sentence, "low"
+
     first_sentence = re.sub(
         r"^(?:in|around|about|approximately)\s+(?:the\s+)?",
         "",
@@ -399,6 +408,24 @@ def _extract_title(text: str, location: Optional[str]) -> tuple[str, str]:
         first_sentence = first_sentence[0].upper() + first_sentence[1:]
 
     return first_sentence, "low"
+
+
+def _warning_text(language: str, warning_type: str) -> str:
+    messages = {
+        "en": {
+            "review": REVIEW_WARNING,
+            "year": "No explicit year was found.",
+            "location": "No reliable location was found.",
+            "people": "No named person or relationship was found.",
+        },
+        "zh": {
+            "review": REVIEW_WARNING_ZH,
+            "year": "未识别到明确年份。",
+            "location": "未识别到可靠地点。",
+            "people": "未识别到明确人物或亲属关系。",
+        },
+    }
+    return messages[language][warning_type]
 
 
 def extract_memory(
@@ -420,36 +447,39 @@ def extract_memory(
     if not source_text:
         raise ValueError("Memory text cannot be empty.")
 
-    start_year, end_year, date_certainty, year_confidence = (
-        _extract_year_range(source_text, year_hint)
-    )
-    location, location_confidence = _extract_location(
+    language = detect_language(source_text)
+
+    start_year, end_year, date_certainty, year_confidence = _extract_year_range(
         source_text,
-        location_hint,
+        year_hint,
     )
+    location, location_confidence = _extract_location(source_text, location_hint)
     people, people_confidence = _extract_people(
         source_text,
         people_hint,
+        language,
     )
     emotional_tone, tone_confidence = _extract_emotional_tone(
         source_text,
         emotional_tone_hint,
+        language,
     )
-    title, title_confidence = _extract_title(source_text, location)
+    title, title_confidence = _extract_title(source_text, location, language)
 
-    warnings: list[str] = [REVIEW_WARNING]
+    warnings: list[str] = [_warning_text(language, "review")]
 
     if start_year is None:
-        warnings.append("No explicit year was found.")
+        warnings.append(_warning_text(language, "year"))
 
     if location is None:
-        warnings.append("No reliable location was found.")
+        warnings.append(_warning_text(language, "location"))
 
     if people is None:
-        warnings.append("No named person or relationship was found.")
+        warnings.append(_warning_text(language, "people"))
 
     return MemoryExtractionResult(
         source_text=source_text,
+        detected_language=language,
         event_title=title,
         start_year=start_year,
         end_year=end_year,

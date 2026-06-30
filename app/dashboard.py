@@ -693,8 +693,11 @@ with tabs[3]:
     else:
         materials = list_materials(selected_project_id)
 
+        no_material_label = (
+            "不关联原始素材 / No linked source material"
+        )
         material_options: dict[str, Optional[int]] = {
-            "No linked source material": None
+            no_material_label: None
         }
 
         for material in materials:
@@ -715,17 +718,22 @@ with tabs[3]:
 
             material_options[label] = int(material["material_id"])
 
-        st.subheader("Extract a Life Event from a Memory")
+        st.subheader(
+            "从回忆中提取人生事件 / Extract a Life Event from a Memory"
+        )
 
         st.write(
-            "Paste one memory passage. The prototype extracts a reviewable "
-            "draft and does not save anything until you confirm the fields."
+            "粘贴一段回忆文字。系统会生成可审核的结构化草稿；"
+            "只有在你逐项确认后，内容才会保存。 "
+            "Paste one memory passage. The prototype creates a reviewable "
+            "draft and saves nothing until you confirm the fields."
         )
 
         extraction_source_text = st.text_area(
-            "Memory passage",
+            "回忆文字 / Memory passage",
             height=170,
             placeholder=(
+                "示例：大约在1976年，我和母亲从广州搬到深圳。 "
                 "Example: In the summer of 1958, I walked to primary school "
                 "with my older brother..."
             ),
@@ -733,13 +741,13 @@ with tabs[3]:
         )
 
         extraction_material_label = st.selectbox(
-            "Optional linked source material",
+            "可选关联素材 / Optional linked source material",
             list(material_options.keys()),
             key="memory_extraction_material_label",
         )
 
         extract_memory_submit = st.button(
-            "Extract Reviewable Fields",
+            "提取可审核字段 / Extract Reviewable Fields",
             width="stretch",
             key="extract_memory_submit",
         )
@@ -763,36 +771,153 @@ with tabs[3]:
         )
 
         if extraction_draft:
-            st.warning(
-                "AI-assisted extraction requires human confirmation. "
-                "Review and edit every field before saving."
+            draft_language = extraction_draft.get(
+                "detected_language",
+                "en",
             )
+            is_chinese_draft = draft_language == "zh"
+
+            extraction_ui = {
+                "review_warning": (
+                    "结构化提取结果必须由人工确认。保存前请逐项检查并修改。"
+                    if is_chinese_draft
+                    else "AI-assisted extraction requires human confirmation. "
+                    "Review and edit every field before saving."
+                ),
+                "title_confidence": (
+                    "标题置信度" if is_chinese_draft else "Title confidence"
+                ),
+                "year_confidence": (
+                    "年份置信度" if is_chinese_draft else "Year confidence"
+                ),
+                "location_confidence": (
+                    "地点置信度" if is_chinese_draft else "Location confidence"
+                ),
+                "people_confidence": (
+                    "人物置信度" if is_chinese_draft else "People confidence"
+                ),
+                "tone_confidence": (
+                    "情绪置信度" if is_chinese_draft else "Tone confidence"
+                ),
+                "review_note": (
+                    "审核提示" if is_chinese_draft else "Review note"
+                ),
+                "event_title": (
+                    "确认后的事件标题"
+                    if is_chinese_draft
+                    else "Reviewed event title"
+                ),
+                "event_description": (
+                    "确认后的事件描述"
+                    if is_chinese_draft
+                    else "Reviewed event description"
+                ),
+                "start_year_available": (
+                    "可以确认开始年份"
+                    if is_chinese_draft
+                    else "Reviewed start year is available"
+                ),
+                "start_year": (
+                    "确认后的开始年份"
+                    if is_chinese_draft
+                    else "Reviewed start year"
+                ),
+                "end_year_available": (
+                    "可以确认结束年份"
+                    if is_chinese_draft
+                    else "Reviewed end year is available"
+                ),
+                "end_year": (
+                    "确认后的结束年份"
+                    if is_chinese_draft
+                    else "Reviewed end year"
+                ),
+                "date_certainty": (
+                    "日期确定程度"
+                    if is_chinese_draft
+                    else "Reviewed date certainty"
+                ),
+                "location": (
+                    "确认后的事件地点"
+                    if is_chinese_draft
+                    else "Reviewed event location"
+                ),
+                "people": (
+                    "确认后的相关人物"
+                    if is_chinese_draft
+                    else "Reviewed people involved"
+                ),
+                "emotional_tone": (
+                    "确认后的情绪基调"
+                    if is_chinese_draft
+                    else "Reviewed emotional tone"
+                ),
+                "display_order": (
+                    "时间线显示顺序"
+                    if is_chinese_draft
+                    else "Reviewed timeline display order"
+                ),
+                "source_material": (
+                    "关联的原始素材"
+                    if is_chinese_draft
+                    else "Reviewed linked source material"
+                ),
+                "save": (
+                    "确认并保存人生事件"
+                    if is_chinese_draft
+                    else "Confirm and Save Life Event"
+                ),
+                "discard": (
+                    "放弃本次提取草稿"
+                    if is_chinese_draft
+                    else "Discard Extracted Draft"
+                ),
+                "success": (
+                    "已创建审核后的人生事件，事件编号为"
+                    if is_chinese_draft
+                    else "Reviewed life event created with ID"
+                ),
+            }
+
+            st.warning(extraction_ui["review_warning"])
 
             confidence = extraction_draft.get("field_confidence", {})
+
+            def format_confidence(value: object) -> str:
+                normalized_value = str(value or "unknown").lower()
+                if is_chinese_draft:
+                    return {
+                        "high": "高",
+                        "medium": "中",
+                        "low": "低",
+                        "unknown": "未知",
+                    }.get(normalized_value, normalized_value)
+                return normalized_value.title()
+
             confidence_cols = st.columns(5)
             confidence_cols[0].metric(
-                "Title confidence",
-                str(confidence.get("event_title", "unknown")).title(),
+                extraction_ui["title_confidence"],
+                format_confidence(confidence.get("event_title")),
             )
             confidence_cols[1].metric(
-                "Year confidence",
-                str(confidence.get("year", "unknown")).title(),
+                extraction_ui["year_confidence"],
+                format_confidence(confidence.get("year")),
             )
             confidence_cols[2].metric(
-                "Location confidence",
-                str(confidence.get("location", "unknown")).title(),
+                extraction_ui["location_confidence"],
+                format_confidence(confidence.get("location")),
             )
             confidence_cols[3].metric(
-                "People confidence",
-                str(confidence.get("people_involved", "unknown")).title(),
+                extraction_ui["people_confidence"],
+                format_confidence(confidence.get("people_involved")),
             )
             confidence_cols[4].metric(
-                "Tone confidence",
-                str(confidence.get("emotional_tone", "unknown")).title(),
+                extraction_ui["tone_confidence"],
+                format_confidence(confidence.get("emotional_tone")),
             )
 
             for warning in extraction_draft.get("warnings", []):
-                st.caption(f"Review note: {warning}")
+                st.caption(f"{extraction_ui['review_note']}: {warning}")
 
             draft_start_year = extraction_draft.get("start_year")
             draft_end_year = extraction_draft.get("end_year")
@@ -809,8 +934,10 @@ with tabs[3]:
 
             saved_material_label = st.session_state.get(
                 "memory_extraction_linked_material",
-                "No linked source material",
+                no_material_label,
             )
+            if saved_material_label == "No linked source material":
+                saved_material_label = no_material_label
             material_labels = list(material_options.keys())
             material_index = (
                 material_labels.index(saved_material_label)
@@ -820,12 +947,12 @@ with tabs[3]:
 
             with st.form("memory_extraction_review_form"):
                 reviewed_event_title = st.text_input(
-                    "Reviewed event title",
+                    extraction_ui["event_title"],
                     value=extraction_draft.get("event_title", ""),
                 )
 
                 reviewed_event_description = st.text_area(
-                    "Reviewed event description",
+                    extraction_ui["event_description"],
                     value=extraction_draft.get(
                         "event_description",
                         extraction_draft.get("source_text", ""),
@@ -834,13 +961,13 @@ with tabs[3]:
                 )
 
                 reviewed_start_year_enabled = st.checkbox(
-                    "Reviewed start year is available",
+                    extraction_ui["start_year_available"],
                     value=draft_start_year is not None,
                     key="reviewed_start_year_enabled",
                 )
 
                 reviewed_start_year = st.number_input(
-                    "Reviewed start year",
+                    extraction_ui["start_year"],
                     min_value=1850,
                     max_value=2026,
                     value=int(draft_start_year or 1960),
@@ -849,13 +976,13 @@ with tabs[3]:
                 )
 
                 reviewed_end_year_enabled = st.checkbox(
-                    "Reviewed end year is available",
+                    extraction_ui["end_year_available"],
                     value=draft_end_year is not None,
                     key="reviewed_end_year_enabled",
                 )
 
                 reviewed_end_year = st.number_input(
-                    "Reviewed end year",
+                    extraction_ui["end_year"],
                     min_value=1850,
                     max_value=2026,
                     value=int(draft_end_year or reviewed_start_year),
@@ -864,41 +991,50 @@ with tabs[3]:
                 )
 
                 reviewed_date_certainty = st.selectbox(
-                    "Reviewed date certainty",
+                    extraction_ui["date_certainty"],
                     certainty_options,
                     index=certainty_index,
+                    format_func=(
+                        lambda value: {
+                            "Confirmed": "已确认",
+                            "Estimated": "估计",
+                            "Unknown": "未知",
+                        }[value]
+                        if is_chinese_draft
+                        else value
+                    ),
                 )
 
                 reviewed_location = st.text_input(
-                    "Reviewed event location",
+                    extraction_ui["location"],
                     value=extraction_draft.get("location") or "",
                 )
 
                 reviewed_people = st.text_input(
-                    "Reviewed people involved",
+                    extraction_ui["people"],
                     value=extraction_draft.get("people_involved") or "",
                 )
 
                 reviewed_emotional_tone = st.text_input(
-                    "Reviewed emotional tone",
+                    extraction_ui["emotional_tone"],
                     value=extraction_draft.get("emotional_tone") or "",
                 )
 
                 reviewed_display_order = st.number_input(
-                    "Reviewed timeline display order",
+                    extraction_ui["display_order"],
                     min_value=0,
                     value=1,
                     step=1,
                 )
 
                 reviewed_material_label = st.selectbox(
-                    "Reviewed linked source material",
+                    extraction_ui["source_material"],
                     material_labels,
                     index=material_index,
                 )
 
                 confirm_extraction_submit = st.form_submit_button(
-                    "Confirm and Save Life Event",
+                    extraction_ui["save"],
                     width="stretch",
                 )
 
@@ -936,16 +1072,20 @@ with tabs[3]:
                         "memory_extraction_linked_material",
                         None,
                     )
-                    st.success(
-                        "Reviewed life event created with "
-                        f"ID {event_id}."
-                    )
+                    if is_chinese_draft:
+                        st.success(
+                            f"{extraction_ui['success']} {event_id}。"
+                        )
+                    else:
+                        st.success(
+                            f"{extraction_ui['success']} {event_id}."
+                        )
                     st.rerun()
                 except Exception as exc:
                     st.error(str(exc))
 
             if st.button(
-                "Discard Extracted Draft",
+                extraction_ui["discard"],
                 key="discard_memory_extraction_draft",
             ):
                 st.session_state.pop(
