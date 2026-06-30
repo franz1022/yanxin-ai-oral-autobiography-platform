@@ -33,6 +33,7 @@ from app.services.database import (  # noqa: E402
     update_content_review_status,
 )
 from app.services.media_manager import save_uploaded_file  # noqa: E402
+from app.services.memory_extractor import extract_memory  # noqa: E402
 from app.services.story_generator import (  # noqa: E402
     generate_biography,
     generate_event_content_bundle,
@@ -713,6 +714,252 @@ with tabs[3]:
             )
 
             material_options[label] = int(material["material_id"])
+
+        st.subheader("Extract a Life Event from a Memory")
+
+        st.write(
+            "Paste one memory passage. The prototype extracts a reviewable "
+            "draft and does not save anything until you confirm the fields."
+        )
+
+        extraction_source_text = st.text_area(
+            "Memory passage",
+            height=170,
+            placeholder=(
+                "Example: In the summer of 1958, I walked to primary school "
+                "with my older brother..."
+            ),
+            key="memory_extraction_source_text",
+        )
+
+        extraction_material_label = st.selectbox(
+            "Optional linked source material",
+            list(material_options.keys()),
+            key="memory_extraction_material_label",
+        )
+
+        extract_memory_submit = st.button(
+            "Extract Reviewable Fields",
+            width="stretch",
+            key="extract_memory_submit",
+        )
+
+        if extract_memory_submit:
+            try:
+                extraction_result = extract_memory(
+                    extraction_source_text,
+                )
+                st.session_state["memory_extraction_draft"] = (
+                    extraction_result.to_dict()
+                )
+                st.session_state["memory_extraction_linked_material"] = (
+                    extraction_material_label
+                )
+            except Exception as exc:
+                st.error(str(exc))
+
+        extraction_draft = st.session_state.get(
+            "memory_extraction_draft"
+        )
+
+        if extraction_draft:
+            st.warning(
+                "AI-assisted extraction requires human confirmation. "
+                "Review and edit every field before saving."
+            )
+
+            confidence = extraction_draft.get("field_confidence", {})
+            confidence_cols = st.columns(5)
+            confidence_cols[0].metric(
+                "Title confidence",
+                str(confidence.get("event_title", "unknown")).title(),
+            )
+            confidence_cols[1].metric(
+                "Year confidence",
+                str(confidence.get("year", "unknown")).title(),
+            )
+            confidence_cols[2].metric(
+                "Location confidence",
+                str(confidence.get("location", "unknown")).title(),
+            )
+            confidence_cols[3].metric(
+                "People confidence",
+                str(confidence.get("people_involved", "unknown")).title(),
+            )
+            confidence_cols[4].metric(
+                "Tone confidence",
+                str(confidence.get("emotional_tone", "unknown")).title(),
+            )
+
+            for warning in extraction_draft.get("warnings", []):
+                st.caption(f"Review note: {warning}")
+
+            draft_start_year = extraction_draft.get("start_year")
+            draft_end_year = extraction_draft.get("end_year")
+            draft_date_certainty = extraction_draft.get(
+                "date_certainty",
+                "Estimated",
+            )
+            certainty_options = ["Confirmed", "Estimated", "Unknown"]
+            certainty_index = (
+                certainty_options.index(draft_date_certainty)
+                if draft_date_certainty in certainty_options
+                else 1
+            )
+
+            saved_material_label = st.session_state.get(
+                "memory_extraction_linked_material",
+                "No linked source material",
+            )
+            material_labels = list(material_options.keys())
+            material_index = (
+                material_labels.index(saved_material_label)
+                if saved_material_label in material_labels
+                else 0
+            )
+
+            with st.form("memory_extraction_review_form"):
+                reviewed_event_title = st.text_input(
+                    "Reviewed event title",
+                    value=extraction_draft.get("event_title", ""),
+                )
+
+                reviewed_event_description = st.text_area(
+                    "Reviewed event description",
+                    value=extraction_draft.get(
+                        "event_description",
+                        extraction_draft.get("source_text", ""),
+                    ),
+                    height=170,
+                )
+
+                reviewed_start_year_enabled = st.checkbox(
+                    "Reviewed start year is available",
+                    value=draft_start_year is not None,
+                    key="reviewed_start_year_enabled",
+                )
+
+                reviewed_start_year = st.number_input(
+                    "Reviewed start year",
+                    min_value=1850,
+                    max_value=2026,
+                    value=int(draft_start_year or 1960),
+                    step=1,
+                    disabled=not reviewed_start_year_enabled,
+                )
+
+                reviewed_end_year_enabled = st.checkbox(
+                    "Reviewed end year is available",
+                    value=draft_end_year is not None,
+                    key="reviewed_end_year_enabled",
+                )
+
+                reviewed_end_year = st.number_input(
+                    "Reviewed end year",
+                    min_value=1850,
+                    max_value=2026,
+                    value=int(draft_end_year or reviewed_start_year),
+                    step=1,
+                    disabled=not reviewed_end_year_enabled,
+                )
+
+                reviewed_date_certainty = st.selectbox(
+                    "Reviewed date certainty",
+                    certainty_options,
+                    index=certainty_index,
+                )
+
+                reviewed_location = st.text_input(
+                    "Reviewed event location",
+                    value=extraction_draft.get("location") or "",
+                )
+
+                reviewed_people = st.text_input(
+                    "Reviewed people involved",
+                    value=extraction_draft.get("people_involved") or "",
+                )
+
+                reviewed_emotional_tone = st.text_input(
+                    "Reviewed emotional tone",
+                    value=extraction_draft.get("emotional_tone") or "",
+                )
+
+                reviewed_display_order = st.number_input(
+                    "Reviewed timeline display order",
+                    min_value=0,
+                    value=1,
+                    step=1,
+                )
+
+                reviewed_material_label = st.selectbox(
+                    "Reviewed linked source material",
+                    material_labels,
+                    index=material_index,
+                )
+
+                confirm_extraction_submit = st.form_submit_button(
+                    "Confirm and Save Life Event",
+                    width="stretch",
+                )
+
+            if confirm_extraction_submit:
+                try:
+                    event_id = create_life_event(
+                        project_id=selected_project_id,
+                        event_title=reviewed_event_title,
+                        event_description=reviewed_event_description,
+                        start_year=year_or_none(
+                            reviewed_start_year_enabled,
+                            int(reviewed_start_year),
+                        ),
+                        end_year=year_or_none(
+                            reviewed_end_year_enabled,
+                            int(reviewed_end_year),
+                        ),
+                        date_certainty=reviewed_date_certainty,
+                        location=reviewed_location or None,
+                        people_involved=reviewed_people or None,
+                        emotional_tone=(
+                            reviewed_emotional_tone or None
+                        ),
+                        display_order=int(reviewed_display_order),
+                        source_material_id=material_options[
+                            reviewed_material_label
+                        ],
+                    )
+
+                    st.session_state.pop(
+                        "memory_extraction_draft",
+                        None,
+                    )
+                    st.session_state.pop(
+                        "memory_extraction_linked_material",
+                        None,
+                    )
+                    st.success(
+                        "Reviewed life event created with "
+                        f"ID {event_id}."
+                    )
+                    st.rerun()
+                except Exception as exc:
+                    st.error(str(exc))
+
+            if st.button(
+                "Discard Extracted Draft",
+                key="discard_memory_extraction_draft",
+            ):
+                st.session_state.pop(
+                    "memory_extraction_draft",
+                    None,
+                )
+                st.session_state.pop(
+                    "memory_extraction_linked_material",
+                    None,
+                )
+                st.rerun()
+
+        st.divider()
+        st.subheader("Manual Life Event Entry")
 
         with st.form("life_event_form"):
             event_title = st.text_input("Event title")
