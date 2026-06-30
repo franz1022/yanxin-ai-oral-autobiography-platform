@@ -1,0 +1,403 @@
+{
+  "dataset_name": "Yanxin Memory Extraction Evaluation Set",
+  "version": "1.0.0",
+  "description": "A privacy-safe, fully fictional bilingual evaluation dataset for the local rule-based memory extractor. Labels represent the intended structured life-event fields rather than the extractor's implementation details.",
+  "core_fields": [
+    "start_year",
+    "end_year",
+    "location",
+    "people_involved",
+    "emotional_tone"
+  ],
+  "supporting_fields": [
+    "detected_language",
+    "event_title",
+    "date_certainty"
+  ],
+  "cases": [
+    {
+      "case_id": "zh_001",
+      "language": "zh",
+      "difficulty": "easy",
+      "memory_text": "大约在1976年，我和母亲从广州搬到深圳。虽然生活辛苦，但我们对新生活充满希望。",
+      "expected": {
+        "detected_language": "zh",
+        "event_title": "搬到深圳",
+        "start_year": 1976,
+        "end_year": null,
+        "date_certainty": "Estimated",
+        "location": "广州 → 深圳",
+        "people_involved": "讲述者和母亲",
+        "emotional_tone": "艰难但充满希望"
+      }
+    },
+    {
+      "case_id": "zh_002",
+      "language": "zh",
+      "difficulty": "easy",
+      "memory_text": "1958年，我和哥哥每天步行去小学，在广东的一个虚构村庄长大。那是一段温暖的童年回忆。",
+      "expected": {
+        "detected_language": "zh",
+        "event_title": "步行去小学",
+        "start_year": 1958,
+        "end_year": null,
+        "date_certainty": "Estimated",
+        "location": "广东的一个虚构村庄",
+        "people_involved": "讲述者和哥哥",
+        "emotional_tone": "温暖而怀念"
+      }
+    },
+    {
+      "case_id": "zh_003",
+      "language": "zh",
+      "difficulty": "easy",
+      "memory_text": "1982年，我开始工作，在广州生活。父亲一直鼓励我，我对未来充满希望。",
+      "expected": {
+        "detected_language": "zh",
+        "event_title": "开始工作",
+        "start_year": 1982,
+        "end_year": null,
+        "date_certainty": "Estimated",
+        "location": "广州",
+        "people_involved": "讲述者和父亲",
+        "emotional_tone": "充满希望"
+      }
+    },
+    {
+      "case_id": "zh_004",
+      "language": "zh",
+      "difficulty": "medium",
+      "memory_text": "1990年，我和妻子在深圳举行婚礼。家人和朋友都很开心。",
+      "expected": {
+        "detected_language": "zh",
+        "event_title": "结婚与家庭",
+        "start_year": 1990,
+        "end_year": null,
+        "date_certainty": "Estimated",
+        "location": "深圳",
+        "people_involved": "讲述者、妻子、朋友",
+        "emotional_tone": "喜悦"
+      }
+    },
+    {
+      "case_id": "zh_005",
+      "language": "zh",
+      "difficulty": "easy",
+      "memory_text": "1948年，我出生在广东，和父母住在一起。那段早年生活很平静。",
+      "expected": {
+        "detected_language": "zh",
+        "event_title": "出生与早年家庭",
+        "start_year": 1948,
+        "end_year": null,
+        "date_certainty": "Estimated",
+        "location": "广东",
+        "people_involved": "讲述者和父母",
+        "emotional_tone": "平静而沉思"
+      }
+    },
+    {
+      "case_id": "zh_006",
+      "language": "zh",
+      "difficulty": "medium",
+      "memory_text": "我常常和母亲坐在老家的院子里聊天，那是一段温暖的回忆。",
+      "expected": {
+        "detected_language": "zh",
+        "event_title": "在院子里与母亲聊天",
+        "start_year": null,
+        "end_year": null,
+        "date_certainty": "Unknown",
+        "location": "老家的院子",
+        "people_involved": "讲述者和母亲",
+        "emotional_tone": "温暖而怀念"
+      }
+    },
+    {
+      "case_id": "zh_007",
+      "language": "zh",
+      "difficulty": "medium",
+      "memory_text": "2001年，我在北京生活，和朋友一起庆祝毕业，我们非常开心。",
+      "expected": {
+        "detected_language": "zh",
+        "event_title": "庆祝毕业",
+        "start_year": 2001,
+        "end_year": null,
+        "date_certainty": "Estimated",
+        "location": "北京",
+        "people_involved": "讲述者和朋友",
+        "emotional_tone": "喜悦"
+      }
+    },
+    {
+      "case_id": "zh_008",
+      "language": "zh",
+      "difficulty": "medium",
+      "memory_text": "1998年，我在上海工作，父亲离开了我们，我感到非常悲伤。",
+      "expected": {
+        "detected_language": "zh",
+        "event_title": "父亲离世",
+        "start_year": 1998,
+        "end_year": null,
+        "date_certainty": "Estimated",
+        "location": "上海",
+        "people_involved": "讲述者和父亲",
+        "emotional_tone": "悲伤而沉思"
+      }
+    },
+    {
+      "case_id": "zh_009",
+      "language": "zh",
+      "difficulty": "medium",
+      "memory_text": "从1966年到1968年，我在广州学习，和同学一起度过了艰难的日子。",
+      "expected": {
+        "detected_language": "zh",
+        "event_title": "在广州求学",
+        "start_year": 1966,
+        "end_year": 1968,
+        "date_certainty": "Estimated",
+        "location": "广州",
+        "people_involved": "讲述者和同学",
+        "emotional_tone": "艰难而沉思"
+      }
+    },
+    {
+      "case_id": "zh_010",
+      "language": "zh",
+      "difficulty": "medium",
+      "memory_text": "1972年，我在佛山生活。那段童年回忆温暖而安静。",
+      "expected": {
+        "detected_language": "zh",
+        "event_title": "佛山的童年",
+        "start_year": 1972,
+        "end_year": null,
+        "date_certainty": "Estimated",
+        "location": "佛山",
+        "people_involved": null,
+        "emotional_tone": "温暖而怀念"
+      }
+    },
+    {
+      "case_id": "zh_011",
+      "language": "zh",
+      "difficulty": "medium",
+      "memory_text": "1985年，我和姐姐开始工作。虽然辛苦，但我们充满希望。",
+      "expected": {
+        "detected_language": "zh",
+        "event_title": "开始工作",
+        "start_year": 1985,
+        "end_year": null,
+        "date_certainty": "Estimated",
+        "location": null,
+        "people_involved": "讲述者和姐姐",
+        "emotional_tone": "艰难但充满希望"
+      }
+    },
+    {
+      "case_id": "zh_012",
+      "language": "zh",
+      "difficulty": "hard",
+      "memory_text": "1995年，我和母亲坐在厨房窗边，安静地回忆童年。",
+      "expected": {
+        "detected_language": "zh",
+        "event_title": "窗边回忆",
+        "start_year": 1995,
+        "end_year": null,
+        "date_certainty": "Estimated",
+        "location": "厨房窗边",
+        "people_involved": "讲述者和母亲",
+        "emotional_tone": "温暖而怀念"
+      }
+    },
+    {
+      "case_id": "en_001",
+      "language": "en",
+      "difficulty": "easy",
+      "memory_text": "In the summer of 1958, I walked to primary school with my older brother in a fictional village in Guangdong. I remember it warmly.",
+      "expected": {
+        "detected_language": "en",
+        "event_title": "Walking to Primary School",
+        "start_year": 1958,
+        "end_year": null,
+        "date_certainty": "Estimated",
+        "location": "Guangdong",
+        "people_involved": "Storyteller and older brother",
+        "emotional_tone": "Warm and nostalgic"
+      }
+    },
+    {
+      "case_id": "en_002",
+      "language": "en",
+      "difficulty": "hard",
+      "memory_text": "Around 1976, I moved from Guangzhou to Shenzhen with my mother. Life was difficult, but we were hopeful about the new beginning.",
+      "expected": {
+        "detected_language": "en",
+        "event_title": "Moving to Shenzhen",
+        "start_year": 1976,
+        "end_year": null,
+        "date_certainty": "Estimated",
+        "location": "Guangzhou → Shenzhen",
+        "people_involved": "Storyteller and mother",
+        "emotional_tone": "Difficult but hopeful"
+      }
+    },
+    {
+      "case_id": "en_003",
+      "language": "en",
+      "difficulty": "easy",
+      "memory_text": "In 1982, I started work in Hong Kong with my father nearby. I felt hopeful about the future.",
+      "expected": {
+        "detected_language": "en",
+        "event_title": "Starting Work",
+        "start_year": 1982,
+        "end_year": null,
+        "date_certainty": "Estimated",
+        "location": "Hong Kong",
+        "people_involved": "Storyteller and father",
+        "emotional_tone": "Hopeful"
+      }
+    },
+    {
+      "case_id": "en_004",
+      "language": "en",
+      "difficulty": "medium",
+      "memory_text": "In 1990, I married my wife at a fictional community hall in Shenzhen. Our friends celebrated happily.",
+      "expected": {
+        "detected_language": "en",
+        "event_title": "Marriage and Family",
+        "start_year": 1990,
+        "end_year": null,
+        "date_certainty": "Estimated",
+        "location": "Shenzhen",
+        "people_involved": "Storyteller, wife, friend",
+        "emotional_tone": "Joyful"
+      }
+    },
+    {
+      "case_id": "en_005",
+      "language": "en",
+      "difficulty": "easy",
+      "memory_text": "In 1948, I was born in Guangdong. I lived with my parents, and my early life was quiet and reflective.",
+      "expected": {
+        "detected_language": "en",
+        "event_title": "Birth and Early Family",
+        "start_year": 1948,
+        "end_year": null,
+        "date_certainty": "Estimated",
+        "location": "Guangdong",
+        "people_involved": "Storyteller and parents",
+        "emotional_tone": "Reflective"
+      }
+    },
+    {
+      "case_id": "en_006",
+      "language": "en",
+      "difficulty": "medium",
+      "memory_text": "I often sat with my mother in the family courtyard and remembered our childhood warmly.",
+      "expected": {
+        "detected_language": "en",
+        "event_title": "Conversations in the Family Courtyard",
+        "start_year": null,
+        "end_year": null,
+        "date_certainty": "Unknown",
+        "location": "the family courtyard",
+        "people_involved": "Storyteller and mother",
+        "emotional_tone": "Warm and nostalgic"
+      }
+    },
+    {
+      "case_id": "en_007",
+      "language": "en",
+      "difficulty": "medium",
+      "memory_text": "In 2001, I lived in Beijing with my friends and celebrated graduation happily.",
+      "expected": {
+        "detected_language": "en",
+        "event_title": "Celebrating Graduation",
+        "start_year": 2001,
+        "end_year": null,
+        "date_certainty": "Estimated",
+        "location": "Beijing",
+        "people_involved": "Storyteller and friend",
+        "emotional_tone": "Joyful"
+      }
+    },
+    {
+      "case_id": "en_008",
+      "language": "en",
+      "difficulty": "medium",
+      "memory_text": "In 1998, I worked in Shanghai. After my father's loss, I felt sad and reflective.",
+      "expected": {
+        "detected_language": "en",
+        "event_title": "Remembering My Father",
+        "start_year": 1998,
+        "end_year": null,
+        "date_certainty": "Estimated",
+        "location": "Shanghai",
+        "people_involved": "Storyteller and father",
+        "emotional_tone": "Sad and reflective"
+      }
+    },
+    {
+      "case_id": "en_009",
+      "language": "en",
+      "difficulty": "medium",
+      "memory_text": "Between 1966 and 1968, I studied at a school in Guangzhou with my classmates during a difficult period.",
+      "expected": {
+        "detected_language": "en",
+        "event_title": "Studying in Guangzhou",
+        "start_year": 1966,
+        "end_year": 1968,
+        "date_certainty": "Estimated",
+        "location": "Guangzhou",
+        "people_involved": "Storyteller and classmate",
+        "emotional_tone": "Difficult and reflective"
+      }
+    },
+    {
+      "case_id": "en_010",
+      "language": "en",
+      "difficulty": "medium",
+      "memory_text": "In 1972, I lived in Foshan. I remembered a warm childhood.",
+      "expected": {
+        "detected_language": "en",
+        "event_title": "Childhood in Foshan",
+        "start_year": 1972,
+        "end_year": null,
+        "date_certainty": "Estimated",
+        "location": "Foshan",
+        "people_involved": null,
+        "emotional_tone": "Warm and nostalgic"
+      }
+    },
+    {
+      "case_id": "en_011",
+      "language": "en",
+      "difficulty": "medium",
+      "memory_text": "In 1985, I started work with my older sister. It was difficult, but I remained hopeful.",
+      "expected": {
+        "detected_language": "en",
+        "event_title": "Starting Work",
+        "start_year": 1985,
+        "end_year": null,
+        "date_certainty": "Estimated",
+        "location": null,
+        "people_involved": "Storyteller and older sister",
+        "emotional_tone": "Difficult but hopeful"
+      }
+    },
+    {
+      "case_id": "en_012",
+      "language": "en",
+      "difficulty": "hard",
+      "memory_text": "In 1995, I sat near the kitchen window with my mother and remembered childhood.",
+      "expected": {
+        "detected_language": "en",
+        "event_title": "Memories by the Kitchen Window",
+        "start_year": 1995,
+        "end_year": null,
+        "date_certainty": "Estimated",
+        "location": "the kitchen window",
+        "people_involved": "Storyteller and mother",
+        "emotional_tone": "Warm and nostalgic"
+      }
+    }
+  ]
+}

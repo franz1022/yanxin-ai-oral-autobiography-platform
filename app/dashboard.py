@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import sys
 from pathlib import Path
 from typing import Any, Optional
@@ -9,6 +10,12 @@ import streamlit as st
 
 
 BASE_DIR = Path(__file__).resolve().parents[1]
+EVALUATION_SNAPSHOT_PATH = (
+    BASE_DIR
+    / "data"
+    / "evaluation"
+    / "memory_extraction_evaluation_snapshot.json"
+)
 
 if str(BASE_DIR) not in sys.path:
     sys.path.insert(0, str(BASE_DIR))
@@ -33,6 +40,11 @@ from app.services.database import (  # noqa: E402
     update_content_review_status,
 )
 from app.services.media_manager import save_uploaded_file  # noqa: E402
+from app.services.memory_extraction_providers import (  # noqa: E402
+    RULE_BASED_PROVIDER_ID,
+    extract_memory_with_provider,
+    list_memory_extraction_providers,
+)
 from app.services.story_generator import (  # noqa: E402
     generate_biography,
     generate_event_content_bundle,
@@ -69,6 +81,31 @@ def dataframe_from_records(
 
 def year_or_none(enabled: bool, value: int) -> Optional[int]:
     return int(value) if enabled else None
+
+
+def load_evaluation_snapshot() -> Optional[dict[str, Any]]:
+    """Load the versioned evaluation snapshot used by the analytics tab."""
+    if not EVALUATION_SNAPSHOT_PATH.exists():
+        return None
+
+    try:
+        with EVALUATION_SNAPSHOT_PATH.open(
+            "r",
+            encoding="utf-8",
+        ) as snapshot_file:
+            snapshot = json.load(snapshot_file)
+    except (OSError, json.JSONDecodeError):
+        return None
+
+    return snapshot if isinstance(snapshot, dict) else None
+
+
+def percentage_label(value: object) -> str:
+    """Format a numeric evaluation value as a percentage label."""
+    try:
+        return f"{float(value):.2f}%"
+    except (TypeError, ValueError):
+        return "N/A"
 
 
 def get_selected_project() -> tuple[Optional[int], Optional[dict[str, Any]]]:
@@ -198,6 +235,7 @@ tabs = st.tabs(
         "Life Timeline",
         "Generate Content",
         "Review",
+        "Evaluation Analytics",
     ]
 )
 
@@ -692,8 +730,11 @@ with tabs[3]:
     else:
         materials = list_materials(selected_project_id)
 
+        no_material_label = (
+            "不关联原始素材 / No linked source material"
+        )
         material_options: dict[str, Optional[int]] = {
-            "No linked source material": None
+            no_material_label: None
         }
 
         for material in materials:
@@ -713,6 +754,467 @@ with tabs[3]:
             )
 
             material_options[label] = int(material["material_id"])
+
+        st.subheader(
+            "从回忆中提取人生事件 / Extract a Life Event from a Memory"
+        )
+
+        st.write(
+            "粘贴一段回忆文字。系统会生成可审核的结构化草稿；"
+            "只有在你逐项确认后，内容才会保存。 "
+            "Paste one memory passage. The prototype creates a reviewable "
+            "draft and saves nothing until you confirm the fields."
+        )
+
+        provider_infos = list_memory_extraction_providers()
+        provider_by_label = {
+            (
+                f"{provider.display_name_zh} / "
+                f"{provider.display_name_en}"
+            ): provider
+            for provider in provider_infos
+        }
+
+        default_provider_label = next(
+            label
+            for label, provider in provider_by_label.items()
+            if provider.provider_id == RULE_BASED_PROVIDER_ID
+        )
+
+        def clear_memory_extraction_draft_on_provider_change() -> None:
+            """Clear stale review state when the extraction provider changes."""
+            st.session_state.pop("memory_extraction_draft", None)
+            st.session_state.pop("memory_extraction_linked_material", None)
+
+        selected_provider_label = st.selectbox(
+            "提取模式 / Extraction mode",
+            options=list(provider_by_label.keys()),
+            index=list(provider_by_label.keys()).index(
+                default_provider_label
+            ),
+            key="memory_extraction_provider_label",
+            on_change=clear_memory_extraction_draft_on_provider_change,
+        )
+        selected_provider = provider_by_label[selected_provider_label]
+
+        if selected_provider.available:
+            st.caption(
+                f"{selected_provider.description_zh} "
+                f"{selected_provider.description_en}"
+            )
+        else:
+            st.info(
+                f"{selected_provider.description_zh} "
+                f"{selected_provider.description_en}"
+            )
+
+        extraction_source_text = st.text_area(
+            "回忆文字 / Memory passage",
+            height=170,
+            placeholder=(
+                "示例：大约在1976年，我和母亲从广州搬到深圳。 "
+                "Example: In the summer of 1958, I walked to primary school "
+                "with my older brother..."
+            ),
+            key="memory_extraction_source_text",
+        )
+
+        extraction_material_label = st.selectbox(
+            "可选关联素材 / Optional linked source material",
+            list(material_options.keys()),
+            key="memory_extraction_material_label",
+        )
+
+        extract_memory_submit = st.button(
+            "提取可审核字段 / Extract Reviewable Fields",
+            width="stretch",
+            key="extract_memory_submit",
+            disabled=not selected_provider.available,
+        )
+
+        if extract_memory_submit:
+            try:
+                extraction_result = extract_memory_with_provider(
+                    extraction_source_text,
+                    provider_id=selected_provider.provider_id,
+                )
+                extraction_draft_payload = extraction_result.to_dict()
+                extraction_draft_payload["provider_id"] = (
+                    selected_provider.provider_id
+                )
+                extraction_draft_payload["provider_name_en"] = (
+                    selected_provider.display_name_en
+                )
+                extraction_draft_payload["provider_name_zh"] = (
+                    selected_provider.display_name_zh
+                )
+                extraction_draft_payload["provider_sends_data_external"] = (
+                    selected_provider.sends_data_external
+                )
+                st.session_state["memory_extraction_draft"] = (
+                    extraction_draft_payload
+                )
+                st.session_state["memory_extraction_linked_material"] = (
+                    extraction_material_label
+                )
+            except Exception as exc:
+                st.error(str(exc))
+
+        extraction_draft = st.session_state.get(
+            "memory_extraction_draft"
+        )
+
+        # Defensive check: never show a draft produced by a different provider.
+        if (
+            extraction_draft
+            and extraction_draft.get("provider_id")
+            != selected_provider.provider_id
+        ):
+            st.session_state.pop("memory_extraction_draft", None)
+            st.session_state.pop("memory_extraction_linked_material", None)
+            extraction_draft = None
+
+        if extraction_draft:
+            draft_language = extraction_draft.get(
+                "detected_language",
+                "en",
+            )
+            is_chinese_draft = draft_language == "zh"
+
+            extraction_ui = {
+                "review_warning": (
+                    "结构化提取结果必须由人工确认。保存前请逐项检查并修改。"
+                    if is_chinese_draft
+                    else "AI-assisted extraction requires human confirmation. "
+                    "Review and edit every field before saving."
+                ),
+                "title_confidence": (
+                    "标题置信度" if is_chinese_draft else "Title confidence"
+                ),
+                "year_confidence": (
+                    "年份置信度" if is_chinese_draft else "Year confidence"
+                ),
+                "location_confidence": (
+                    "地点置信度" if is_chinese_draft else "Location confidence"
+                ),
+                "people_confidence": (
+                    "人物置信度" if is_chinese_draft else "People confidence"
+                ),
+                "tone_confidence": (
+                    "情绪置信度" if is_chinese_draft else "Tone confidence"
+                ),
+                "review_note": (
+                    "审核提示" if is_chinese_draft else "Review note"
+                ),
+                "event_title": (
+                    "确认后的事件标题"
+                    if is_chinese_draft
+                    else "Reviewed event title"
+                ),
+                "event_description": (
+                    "确认后的事件描述"
+                    if is_chinese_draft
+                    else "Reviewed event description"
+                ),
+                "start_year_available": (
+                    "可以确认开始年份"
+                    if is_chinese_draft
+                    else "Reviewed start year is available"
+                ),
+                "start_year": (
+                    "确认后的开始年份"
+                    if is_chinese_draft
+                    else "Reviewed start year"
+                ),
+                "end_year_available": (
+                    "可以确认结束年份"
+                    if is_chinese_draft
+                    else "Reviewed end year is available"
+                ),
+                "end_year": (
+                    "确认后的结束年份"
+                    if is_chinese_draft
+                    else "Reviewed end year"
+                ),
+                "date_certainty": (
+                    "日期确定程度"
+                    if is_chinese_draft
+                    else "Reviewed date certainty"
+                ),
+                "location": (
+                    "确认后的事件地点"
+                    if is_chinese_draft
+                    else "Reviewed event location"
+                ),
+                "people": (
+                    "确认后的相关人物"
+                    if is_chinese_draft
+                    else "Reviewed people involved"
+                ),
+                "emotional_tone": (
+                    "确认后的情绪基调"
+                    if is_chinese_draft
+                    else "Reviewed emotional tone"
+                ),
+                "display_order": (
+                    "时间线显示顺序"
+                    if is_chinese_draft
+                    else "Reviewed timeline display order"
+                ),
+                "source_material": (
+                    "关联的原始素材"
+                    if is_chinese_draft
+                    else "Reviewed linked source material"
+                ),
+                "save": (
+                    "确认并保存人生事件"
+                    if is_chinese_draft
+                    else "Confirm and Save Life Event"
+                ),
+                "discard": (
+                    "放弃本次提取草稿"
+                    if is_chinese_draft
+                    else "Discard Extracted Draft"
+                ),
+                "success": (
+                    "已创建审核后的人生事件，事件编号为"
+                    if is_chinese_draft
+                    else "Reviewed life event created with ID"
+                ),
+            }
+
+            st.warning(extraction_ui["review_warning"])
+
+            provider_name = (
+                extraction_draft.get("provider_name_zh")
+                if is_chinese_draft
+                else extraction_draft.get("provider_name_en")
+            )
+            if provider_name:
+                if is_chinese_draft:
+                    st.caption(f"本次提取模式：{provider_name}")
+                else:
+                    st.caption(f"Extraction mode: {provider_name}")
+
+            confidence = extraction_draft.get("field_confidence", {})
+
+            def format_confidence(value: object) -> str:
+                normalized_value = str(value or "unknown").lower()
+                if is_chinese_draft:
+                    return {
+                        "high": "高",
+                        "medium": "中",
+                        "low": "低",
+                        "unknown": "未知",
+                    }.get(normalized_value, normalized_value)
+                return normalized_value.title()
+
+            confidence_cols = st.columns(5)
+            confidence_cols[0].metric(
+                extraction_ui["title_confidence"],
+                format_confidence(confidence.get("event_title")),
+            )
+            confidence_cols[1].metric(
+                extraction_ui["year_confidence"],
+                format_confidence(confidence.get("year")),
+            )
+            confidence_cols[2].metric(
+                extraction_ui["location_confidence"],
+                format_confidence(confidence.get("location")),
+            )
+            confidence_cols[3].metric(
+                extraction_ui["people_confidence"],
+                format_confidence(confidence.get("people_involved")),
+            )
+            confidence_cols[4].metric(
+                extraction_ui["tone_confidence"],
+                format_confidence(confidence.get("emotional_tone")),
+            )
+
+            for warning in extraction_draft.get("warnings", []):
+                st.caption(f"{extraction_ui['review_note']}: {warning}")
+
+            draft_start_year = extraction_draft.get("start_year")
+            draft_end_year = extraction_draft.get("end_year")
+            draft_date_certainty = extraction_draft.get(
+                "date_certainty",
+                "Estimated",
+            )
+            certainty_options = ["Confirmed", "Estimated", "Unknown"]
+            certainty_index = (
+                certainty_options.index(draft_date_certainty)
+                if draft_date_certainty in certainty_options
+                else 1
+            )
+
+            saved_material_label = st.session_state.get(
+                "memory_extraction_linked_material",
+                no_material_label,
+            )
+            if saved_material_label == "No linked source material":
+                saved_material_label = no_material_label
+            material_labels = list(material_options.keys())
+            material_index = (
+                material_labels.index(saved_material_label)
+                if saved_material_label in material_labels
+                else 0
+            )
+
+            with st.form("memory_extraction_review_form"):
+                reviewed_event_title = st.text_input(
+                    extraction_ui["event_title"],
+                    value=extraction_draft.get("event_title", ""),
+                )
+
+                reviewed_event_description = st.text_area(
+                    extraction_ui["event_description"],
+                    value=extraction_draft.get(
+                        "event_description",
+                        extraction_draft.get("source_text", ""),
+                    ),
+                    height=170,
+                )
+
+                reviewed_start_year_enabled = st.checkbox(
+                    extraction_ui["start_year_available"],
+                    value=draft_start_year is not None,
+                    key="reviewed_start_year_enabled",
+                )
+
+                reviewed_start_year = st.number_input(
+                    extraction_ui["start_year"],
+                    min_value=1850,
+                    max_value=2026,
+                    value=int(draft_start_year or 1960),
+                    step=1,
+                    disabled=not reviewed_start_year_enabled,
+                )
+
+                reviewed_end_year_enabled = st.checkbox(
+                    extraction_ui["end_year_available"],
+                    value=draft_end_year is not None,
+                    key="reviewed_end_year_enabled",
+                )
+
+                reviewed_end_year = st.number_input(
+                    extraction_ui["end_year"],
+                    min_value=1850,
+                    max_value=2026,
+                    value=int(draft_end_year or reviewed_start_year),
+                    step=1,
+                    disabled=not reviewed_end_year_enabled,
+                )
+
+                reviewed_date_certainty = st.selectbox(
+                    extraction_ui["date_certainty"],
+                    certainty_options,
+                    index=certainty_index,
+                    format_func=(
+                        lambda value: {
+                            "Confirmed": "已确认",
+                            "Estimated": "估计",
+                            "Unknown": "未知",
+                        }[value]
+                        if is_chinese_draft
+                        else value
+                    ),
+                )
+
+                reviewed_location = st.text_input(
+                    extraction_ui["location"],
+                    value=extraction_draft.get("location") or "",
+                )
+
+                reviewed_people = st.text_input(
+                    extraction_ui["people"],
+                    value=extraction_draft.get("people_involved") or "",
+                )
+
+                reviewed_emotional_tone = st.text_input(
+                    extraction_ui["emotional_tone"],
+                    value=extraction_draft.get("emotional_tone") or "",
+                )
+
+                reviewed_display_order = st.number_input(
+                    extraction_ui["display_order"],
+                    min_value=0,
+                    value=1,
+                    step=1,
+                )
+
+                reviewed_material_label = st.selectbox(
+                    extraction_ui["source_material"],
+                    material_labels,
+                    index=material_index,
+                )
+
+                confirm_extraction_submit = st.form_submit_button(
+                    extraction_ui["save"],
+                    width="stretch",
+                )
+
+            if confirm_extraction_submit:
+                try:
+                    event_id = create_life_event(
+                        project_id=selected_project_id,
+                        event_title=reviewed_event_title,
+                        event_description=reviewed_event_description,
+                        start_year=year_or_none(
+                            reviewed_start_year_enabled,
+                            int(reviewed_start_year),
+                        ),
+                        end_year=year_or_none(
+                            reviewed_end_year_enabled,
+                            int(reviewed_end_year),
+                        ),
+                        date_certainty=reviewed_date_certainty,
+                        location=reviewed_location or None,
+                        people_involved=reviewed_people or None,
+                        emotional_tone=(
+                            reviewed_emotional_tone or None
+                        ),
+                        display_order=int(reviewed_display_order),
+                        source_material_id=material_options[
+                            reviewed_material_label
+                        ],
+                    )
+
+                    st.session_state.pop(
+                        "memory_extraction_draft",
+                        None,
+                    )
+                    st.session_state.pop(
+                        "memory_extraction_linked_material",
+                        None,
+                    )
+                    if is_chinese_draft:
+                        st.success(
+                            f"{extraction_ui['success']} {event_id}。"
+                        )
+                    else:
+                        st.success(
+                            f"{extraction_ui['success']} {event_id}."
+                        )
+                    st.rerun()
+                except Exception as exc:
+                    st.error(str(exc))
+
+            if st.button(
+                extraction_ui["discard"],
+                key="discard_memory_extraction_draft",
+            ):
+                st.session_state.pop(
+                    "memory_extraction_draft",
+                    None,
+                )
+                st.session_state.pop(
+                    "memory_extraction_linked_material",
+                    None,
+                )
+                st.rerun()
+
+        st.divider()
+        st.subheader("Manual Life Event Entry")
 
         with st.form("life_event_form"):
             event_title = st.text_input("Event title")
@@ -1084,6 +1586,285 @@ with tabs[5]:
                 width="stretch",
                 hide_index=True,
             )
+
+
+
+with tabs[6]:
+    st.header("Memory Extraction Evaluation Analytics")
+
+    st.caption(
+        "Versioned results from fictional bilingual development and "
+        "frozen holdout benchmarks."
+    )
+
+    evaluation_snapshot = load_evaluation_snapshot()
+
+    if evaluation_snapshot is None:
+        st.warning(
+            "The evaluation snapshot is unavailable. Add "
+            "`data/evaluation/memory_extraction_evaluation_snapshot.json` "
+            "or regenerate the evaluation artefacts before using this page."
+        )
+    else:
+        metadata = evaluation_snapshot.get("metadata", {})
+        development_baseline = evaluation_snapshot.get(
+            "development_baseline",
+            {},
+        )
+        development_optimized = evaluation_snapshot.get(
+            "development_optimized",
+            {},
+        )
+        holdout = evaluation_snapshot.get("holdout", {})
+
+        st.info(
+            "The extraction rules were frozen before the one-shot holdout "
+            "evaluation. Holdout cases must not be used for further rule "
+            "tuning."
+        )
+
+        headline_cols = st.columns(4)
+        headline_cols[0].metric(
+            "Holdout Core-Field Accuracy",
+            percentage_label(
+                holdout.get("core_field_micro_accuracy")
+            ),
+        )
+        headline_cols[1].metric(
+            "Holdout Complete Records",
+            percentage_label(
+                holdout.get("core_complete_record_accuracy")
+            ),
+        )
+        headline_cols[2].metric(
+            "Holdout All-Field Accuracy",
+            percentage_label(
+                holdout.get("all_field_micro_accuracy")
+            ),
+        )
+        headline_cols[3].metric(
+            "Human-Review Flag Rate",
+            percentage_label(
+                holdout.get("human_review_flag_rate")
+            ),
+        )
+
+        st.subheader("Evaluation Stages")
+
+        stage_frame = pd.DataFrame(
+            [
+                {
+                    "Evaluation stage": "Development baseline",
+                    "Cases": development_baseline.get("cases"),
+                    "Core-field accuracy (%)": (
+                        development_baseline.get(
+                            "core_field_micro_accuracy"
+                        )
+                    ),
+                    "Complete-record accuracy (%)": (
+                        development_baseline.get(
+                            "core_complete_record_accuracy"
+                        )
+                    ),
+                    "All-field accuracy (%)": (
+                        development_baseline.get(
+                            "all_field_micro_accuracy"
+                        )
+                    ),
+                },
+                {
+                    "Evaluation stage": "Development after improvement",
+                    "Cases": development_optimized.get("cases"),
+                    "Core-field accuracy (%)": (
+                        development_optimized.get(
+                            "core_field_micro_accuracy"
+                        )
+                    ),
+                    "Complete-record accuracy (%)": (
+                        development_optimized.get(
+                            "core_complete_record_accuracy"
+                        )
+                    ),
+                    "All-field accuracy (%)": (
+                        development_optimized.get(
+                            "all_field_micro_accuracy"
+                        )
+                    ),
+                },
+                {
+                    "Evaluation stage": "Frozen one-shot holdout",
+                    "Cases": holdout.get("cases"),
+                    "Core-field accuracy (%)": (
+                        holdout.get("core_field_micro_accuracy")
+                    ),
+                    "Complete-record accuracy (%)": (
+                        holdout.get(
+                            "core_complete_record_accuracy"
+                        )
+                    ),
+                    "All-field accuracy (%)": (
+                        holdout.get("all_field_micro_accuracy")
+                    ),
+                },
+            ]
+        )
+
+        st.dataframe(
+            stage_frame,
+            width="stretch",
+            hide_index=True,
+        )
+
+        stage_chart = stage_frame.set_index(
+            "Evaluation stage"
+        )[
+            [
+                "Core-field accuracy (%)",
+                "Complete-record accuracy (%)",
+                "All-field accuracy (%)",
+            ]
+        ]
+        st.bar_chart(stage_chart, stack=False)
+
+        st.caption(
+            "The 100% development result was obtained after the development "
+            "cases had been used for error analysis. The frozen holdout "
+            "result is the independent generalisation estimate."
+        )
+
+        st.subheader("Field Accuracy")
+
+        field_frame = pd.DataFrame(
+            evaluation_snapshot.get("field_metrics", [])
+        )
+
+        if field_frame.empty:
+            st.info("No field-level metrics are available.")
+        else:
+            display_field_frame = field_frame.rename(
+                columns={
+                    "field": "Field",
+                    "field_group": "Group",
+                    "development_accuracy": (
+                        "Development accuracy (%)"
+                    ),
+                    "holdout_accuracy": "Holdout accuracy (%)",
+                    "holdout_wrong_value_count": (
+                        "Holdout wrong values"
+                    ),
+                }
+            )
+
+            st.dataframe(
+                display_field_frame,
+                width="stretch",
+                hide_index=True,
+            )
+
+            field_chart = display_field_frame.set_index(
+                "Field"
+            )[
+                [
+                    "Development accuracy (%)",
+                    "Holdout accuracy (%)",
+                ]
+            ]
+            st.bar_chart(field_chart, stack=False)
+
+            error_chart = display_field_frame.set_index(
+                "Field"
+            )[["Holdout wrong values"]]
+            st.subheader("Holdout Errors by Field")
+            st.bar_chart(error_chart)
+
+        st.subheader("Language Comparison")
+
+        language_frame = pd.DataFrame(
+            evaluation_snapshot.get("language_metrics", [])
+        )
+
+        if language_frame.empty:
+            st.info("No language-level metrics are available.")
+        else:
+            display_language_frame = language_frame.rename(
+                columns={
+                    "language": "Language",
+                    "cases": "Cases",
+                    "average_core_field_accuracy": (
+                        "Average core-field accuracy (%)"
+                    ),
+                    "core_complete_record_accuracy": (
+                        "Complete-record accuracy (%)"
+                    ),
+                    "average_all_field_accuracy": (
+                        "Average all-field accuracy (%)"
+                    ),
+                }
+            )
+
+            st.dataframe(
+                display_language_frame,
+                width="stretch",
+                hide_index=True,
+            )
+
+            language_chart = display_language_frame.set_index(
+                "Language"
+            )[
+                [
+                    "Average core-field accuracy (%)",
+                    "Complete-record accuracy (%)",
+                    "Average all-field accuracy (%)",
+                ]
+            ]
+            st.bar_chart(language_chart, stack=False)
+
+        st.subheader("Interpretation")
+
+        interpretation_points = evaluation_snapshot.get(
+            "interpretation",
+            [],
+        )
+
+        for point in interpretation_points:
+            st.markdown(f"- {point}")
+
+        with st.expander("Governance and reproducibility details"):
+            st.write(
+                f"**Frozen extraction-rule commit:** "
+                f"`{metadata.get('frozen_rule_commit', 'N/A')}`"
+            )
+            st.write(
+                f"**Evaluated Git HEAD:** "
+                f"`{metadata.get('evaluated_git_head', 'N/A')}`"
+            )
+            st.write(
+                f"**Holdout dataset SHA-256:** "
+                f"`{metadata.get('holdout_dataset_sha256', 'N/A')}`"
+            )
+            st.write(
+                f"**One-shot protocol:** "
+                f"{metadata.get('one_shot_protocol', False)}"
+            )
+            st.write(
+                f"**Do not tune on holdout:** "
+                f"{metadata.get('do_not_tune_on_holdout', False)}"
+            )
+            st.code(
+                """
+python -m scripts.evaluate_memory_extractor
+python -m scripts.test_memory_extractor_evaluation
+python -m scripts.test_memory_extractor_holdout
+python -m scripts.evaluate_memory_extractor_holdout
+                """.strip(),
+                language="powershell",
+            )
+
+        st.warning(
+            "All benchmark cases are fictional and the sample sizes are "
+            "small. These results describe a portfolio prototype and are "
+            "not a production-performance guarantee."
+        )
 
 
 st.divider()
