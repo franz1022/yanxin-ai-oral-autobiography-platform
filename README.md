@@ -91,6 +91,11 @@ The platform deliberately does **not** claim to:
 ---
 
 ## End-to-End Product Workflow
+### Data and Human-Review Workflow
+
+![Yanxin V2 data and human-review workflow](diagrams/data_review_workflow_v2.png)
+
+[Open editable SVG](diagrams/data_review_workflow_v2.svg)
 
 ```mermaid
 flowchart TD
@@ -288,6 +293,11 @@ This keeps the display logic separate from the evaluation artefacts and makes th
 ---
 
 ## System Architecture
+### Architecture Diagram
+
+![Yanxin V2 system architecture](diagrams/system_architecture_v2.png)
+
+[Open editable SVG](diagrams/system_architecture_v2.svg)
 
 ```mermaid
 flowchart LR
