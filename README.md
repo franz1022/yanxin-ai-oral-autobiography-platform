@@ -1,31 +1,69 @@
 # Yanxin AI Oral Autobiography Platform
 
-A privacy-safe, locally runnable prototype that organises written memories, voice recordings and historical photographs into structured life timelines, editable autobiography drafts, scene reconstruction descriptions, storyboards and future video-generation prompts.
+A privacy-aware, locally runnable portfolio prototype that transforms written memories, voice recordings and historical photographs into reviewable life events, editable autobiography drafts, scene reconstructions, storyboards and future video-generation prompts.
 
-> This repository is a reconstructed portfolio prototype inspired by a 2023 university team project. It does not contain the original private codebase or real personal data.
+> This repository is a reconstructed portfolio project inspired by a 2023 university team project. It does not contain the original private codebase, production models or real personal data.
+
+---
+
+## Project Highlights
+
+- End-to-end Streamlit workflow for oral-history collection and review
+- Local SQLite persistence and file storage
+- Bilingual Chinese–English memory extraction
+- Human-in-the-loop review before life events are saved
+- Pluggable extraction-provider architecture
+- Rule-based local mode with no external data transfer
+- Development benchmark, frozen holdout benchmark and error analysis
+- Evaluation Analytics dashboard
+- Template-based biography, chapter, scene, storyboard and video-prompt generation
+- Privacy, provenance and review-status controls
+
+### Independent Holdout Result
+
+After freezing the extraction rules, the prototype was evaluated once on 20 unseen fictional bilingual cases:
+
+| Metric | Holdout result |
+|---|---:|
+| Core-field micro accuracy | **91.00%** |
+| Core complete-record accuracy | **55.00%** |
+| All-field micro accuracy | **86.87%** |
+| Language detection accuracy | **100.00%** |
+| Human-review flag rate | **100.00%** |
+
+The holdout result is the main generalisation estimate. The 100% development-set result was obtained after those development cases had already been used for error analysis and rule improvement.
 
 ---
 
 ## Project Overview
 
-Many personal and family histories are fragmented across conversations, handwritten notes, voice recordings and old photographs. The Yanxin prototype demonstrates how these materials can be organised into a structured oral-autobiography workflow while keeping users responsible for factual review.
+Family histories are often fragmented across conversations, handwritten notes, voice recordings and old photographs. Yanxin demonstrates how those materials can be organised into a structured oral-autobiography workflow while keeping users responsible for factual verification.
 
-The current prototype supports:
+The platform supports:
 
 - storyteller profile creation;
 - autobiography project management;
 - written memory input;
-- historical photo and audio upload;
-- source-material metadata management;
-- structured life-event timelines;
+- photo and audio upload;
+- source-material metadata;
+- bilingual memory extraction;
+- reviewable structured life events;
+- editable life timelines;
 - template-based biography generation;
 - scene reconstruction descriptions;
 - five-shot storyboards;
 - future video-generation prompts;
-- human review and approval statuses;
+- review statuses such as Draft, Reviewed, Approved and Rejected;
+- evaluation analytics;
 - local SQLite persistence.
 
-The prototype deliberately does **not** claim to generate verified historical footage or to train a production Transformer model.
+The platform deliberately does **not** claim to:
+
+- generate verified historical footage;
+- automatically confirm personal facts;
+- train a production Transformer model;
+- achieve production-level extraction accuracy;
+- send memories to an external AI service in the default workflow.
 
 ---
 
@@ -47,25 +85,203 @@ The prototype deliberately does **not** claim to generate verified historical fo
 
 ![Generated content review](diagrams/screenshots/04_content_review.png)
 
+
 ---
 
-## End-to-End Workflow
+## End-to-End Product Workflow
 
 ```mermaid
 flowchart TD
     A[Voice, Text and Historical Photos] --> B[Material Validation and Local Storage]
-    B --> C[Metadata and Source Records]
-    C --> D[Structured Life Events]
-    D --> E[Biography Draft]
-    D --> F[Scene Description]
-    D --> G[Storyboard]
-    D --> H[Future Video Prompt]
-    E --> I[Human Review]
-    F --> I
-    G --> I
-    H --> I
-    I --> J[Draft, Reviewed, Approved or Rejected]
+    B --> C[Source Metadata]
+    C --> D[Rule-Based Bilingual Memory Extraction]
+    D --> E[Reviewable Structured Draft]
+    E --> F[Human Correction and Confirmation]
+    F --> G[Life Timeline]
+    G --> H[Biography Draft]
+    G --> I[Scene Description]
+    G --> J[Storyboard]
+    G --> K[Future Video Prompt]
+    H --> L[Human Review]
+    I --> L
+    J --> L
+    K --> L
+    L --> M[Draft, Reviewed, Approved or Rejected]
 ```
+
+---
+
+## Memory Extraction Workflow
+
+The local extraction workflow converts one Chinese or English memory passage into:
+
+- detected language;
+- event title;
+- start and end year;
+- date certainty;
+- location;
+- people involved;
+- emotional tone;
+- field-level confidence;
+- review warnings.
+
+Example:
+
+```text
+Input:
+大约在1976年，我和母亲从广州搬到深圳。
+虽然生活辛苦，但我们对新生活充满希望。
+
+Output draft:
+Title: 搬到深圳
+Year: 1976
+Location: 广州 → 深圳
+People: 讲述者和母亲
+Emotion: 艰难但充满希望
+Review required: True
+```
+
+The extracted result is never saved automatically. The user must review and edit the draft before creating a life-event record.
+
+---
+
+## Extraction Provider Architecture
+
+```mermaid
+flowchart TD
+    UI[Streamlit Dashboard] --> P[MemoryExtractionProvider Interface]
+    P --> R[Rule-Based Local Provider]
+    P --> L[Optional LLM Provider]
+    R --> S[Reviewable Structured Result]
+    L --> X[Registered but Disabled]
+    S --> H[Human Review]
+    H --> DB[(SQLite Life Event)]
+```
+
+Current provider behaviour:
+
+| Provider | Availability | External transfer | Purpose |
+|---|---|---:|---|
+| Rule-based demo mode | Available | No | Local, deterministic portfolio baseline |
+| LLM enhanced mode | Registered but disabled | Not used | Future extensibility only |
+
+The optional provider interface demonstrates extensibility without requiring API keys or adding unnecessary model complexity to the public prototype.
+
+---
+
+## Evaluation Methodology
+
+### Development Benchmark
+
+The development benchmark contains:
+
+- 24 fictional cases;
+- 12 Chinese cases;
+- 12 English cases;
+- easy, medium and hard examples;
+- manually labelled target fields.
+
+It was used for:
+
+1. baseline measurement;
+2. error analysis;
+3. targeted rule improvement;
+4. regression testing.
+
+#### Baseline
+
+| Metric | Result |
+|---|---:|
+| Core-field micro accuracy | 95.00% |
+| Core complete-record accuracy | 75.00% |
+| All-field micro accuracy | 90.10% |
+| Event-title accuracy | 45.83% |
+| Location accuracy | 75.00% |
+
+The main error categories were:
+
+- title compression;
+- location-boundary extraction.
+
+#### Development Result After Improvement
+
+| Metric | Result |
+|---|---:|
+| Core-field micro accuracy | 100.00% |
+| Core complete-record accuracy | 100.00% |
+| All-field micro accuracy | 100.00% |
+
+This result is not presented as an independent test result because the development cases were used during rule refinement.
+
+### Frozen One-Shot Holdout
+
+The separate holdout benchmark contains:
+
+- 20 unseen fictional cases;
+- 10 Chinese cases;
+- 10 English cases;
+- no exact text overlap with the development benchmark;
+- labels frozen before evaluation.
+
+Evaluation controls:
+
+```text
+Frozen extraction-rule commit: 0169ccd
+Holdout dataset SHA-256:
+6bab95361b099280fa994ddca6cf2b13f265f11e5399feca5a5a36d4794cb47e
+One-shot protocol: true
+Do not tune on holdout: true
+```
+
+### Holdout Field Results
+
+| Field | Accuracy |
+|---|---:|
+| Detected language | 100.00% |
+| Event title | 40.00% |
+| Date certainty | 100.00% |
+| Start year | 100.00% |
+| End year | 100.00% |
+| Location | 70.00% |
+| People involved | 90.00% |
+| Emotional tone | 95.00% |
+
+### Holdout Language Results
+
+| Language | Cases | Core-field accuracy | Complete-record accuracy | All-field accuracy |
+|---|---:|---:|---:|---:|
+| English | 10 | 94.00% | 70.00% | 88.75% |
+| Chinese | 10 | 88.00% | 40.00% | 85.00% |
+
+The current evidence suggests that explicit years generalise well, while title compression and location boundaries remain the main weaknesses. These findings support the mandatory human-review workflow.
+
+Detailed methodology and limitations are documented in:
+
+[`docs/02_memory_extraction_evaluation.md`](docs/02_memory_extraction_evaluation.md)
+
+---
+
+## Evaluation Analytics Dashboard
+
+The Streamlit dashboard contains an **Evaluation Analytics** tab that displays:
+
+- development baseline;
+- development result after rule improvement;
+- frozen holdout result;
+- field-level accuracy;
+- error count by field;
+- Chinese–English comparison;
+- governance metadata;
+- frozen commit and dataset hash;
+- limitations and interpretation.
+
+The dashboard reads from a versioned evaluation snapshot:
+
+```text
+data/evaluation/memory_extraction_evaluation_snapshot.json
+```
+
+This keeps the display logic separate from the evaluation artefacts and makes the portfolio result reproducible.
 
 ---
 
@@ -75,28 +291,38 @@ flowchart TD
 flowchart LR
     U[Streamlit User Interface] --> DB[Database Service]
     U --> MM[Media Manager]
+    U --> MP[Memory Extraction Providers]
     U --> SG[Story Generator]
+    U --> EA[Evaluation Analytics]
 
     DB --> SQL[(SQLite)]
     MM --> FS[(Local Upload Storage)]
+    MP --> RE[Rule-Based Extractor]
     SG --> OUT[Biography, Scene, Storyboard and Prompt]
+    EA --> SNAP[Versioned Evaluation Snapshot]
 
     SQL --> U
     FS --> U
+    RE --> U
     OUT --> U
+    SNAP --> U
 ```
 
 ### Main Components
 
 | Component | Responsibility |
 |---|---|
-| `app/dashboard.py` | Streamlit interface and end-to-end user workflow |
-| `app/services/database.py` | SQLite connection, inserts, queries and review status updates |
-| `app/services/media_manager.py` | File validation, unique filenames, upload storage and safe deletion |
-| `app/services/story_generator.py` | Template-based biography, chapter, scene, storyboard and prompt generation |
-| `sql/schema.sql` | Relational database schema and indexes |
-| `scripts/rebuild_clean_demo.py` | Rebuilds a clean, fictional demonstration dataset |
-| `scripts/test_*.py` | Service-level validation scripts |
+| `app/dashboard.py` | Streamlit interface and end-to-end workflow |
+| `app/services/database.py` | SQLite inserts, queries and review-status updates |
+| `app/services/media_manager.py` | File validation, local storage and safe deletion |
+| `app/services/memory_extractor.py` | Deterministic bilingual field extraction |
+| `app/services/memory_extraction_providers.py` | Provider abstraction and availability controls |
+| `app/services/story_generator.py` | Biography, chapter, scene, storyboard and prompt generation |
+| `data/evaluation/` | Development benchmark, frozen holdout and analytics snapshot |
+| `scripts/evaluate_memory_extractor.py` | Development benchmark evaluation |
+| `scripts/evaluate_memory_extractor_holdout.py` | One-shot frozen holdout evaluation |
+| `scripts/test_*.py` | Regression, integrity and service validation |
+| `sql/schema.sql` | Relational schema and indexes |
 
 ---
 
@@ -122,7 +348,7 @@ Storyteller
             └── Content Review History
 ```
 
-Foreign-key rules keep project records connected while allowing source materials to be detached safely when required.
+Source provenance is preserved through the optional link between a life event and its source material.
 
 ---
 
@@ -135,7 +361,9 @@ Foreign-key rules keep project records connected while allowing source materials
 - **Image validation:** Pillow
 - **Storage:** Local filesystem
 - **Documentation:** Markdown and Mermaid
-- **Testing:** Python service-level test scripts
+- **Evaluation:** Custom Python benchmark scripts
+- **Testing:** Python regression and service-level scripts
+- **Version control:** Git and GitHub
 
 ---
 
@@ -148,24 +376,36 @@ yanxin-ai-oral-autobiography-platform/
 │   └── services/
 │       ├── database.py
 │       ├── media_manager.py
+│       ├── memory_extractor.py
+│       ├── memory_extraction_providers.py
 │       └── story_generator.py
 ├── data/
+│   ├── evaluation/
+│   │   ├── memory_extraction_cases.json
+│   │   ├── memory_extraction_holdout_cases.json
+│   │   └── memory_extraction_evaluation_snapshot.json
 │   ├── sample/
 │   └── uploads/
 ├── diagrams/
 │   └── screenshots/
 ├── docs/
+│   ├── 02_memory_extraction_evaluation.md
 │   ├── product_requirements.md
 │   ├── role_and_contributions.md
 │   ├── technical_constraints.md
 │   └── user_journey.md
 ├── outputs/
+│   └── evaluation/
 ├── scripts/
+│   ├── evaluate_memory_extractor.py
+│   ├── evaluate_memory_extractor_holdout.py
 │   ├── rebuild_clean_demo.py
-│   ├── test_database_service.py
-│   ├── test_dashboard_dependencies.py
-│   ├── test_media_manager.py
-│   └── test_story_generator.py
+│   ├── test_dashboard_evaluation_analytics.py
+│   ├── test_memory_extraction_providers.py
+│   ├── test_memory_extractor.py
+│   ├── test_memory_extractor_evaluation.py
+│   ├── test_memory_extractor_holdout.py
+│   └── other service tests
 ├── sql/
 │   └── schema.sql
 ├── .gitignore
@@ -173,7 +413,7 @@ yanxin-ai-oral-autobiography-platform/
 └── requirements.txt
 ```
 
-Local databases and user uploads are excluded from Git.
+Local databases, uploads and generated evaluation outputs are excluded from Git where appropriate.
 
 ---
 
@@ -214,7 +454,7 @@ http://localhost:8501
 
 ## Validation Commands
 
-Run the service tests from the project root:
+### Core Services
 
 ```powershell
 python -m scripts.test_database_service
@@ -223,20 +463,47 @@ python -m scripts.test_story_generator
 python -m scripts.test_dashboard_dependencies
 ```
 
-Successful runs should end with messages such as:
+### Memory Extraction
+
+```powershell
+python -m scripts.test_memory_extractor
+python -m scripts.test_memory_extraction_providers
+```
+
+### Development Evaluation
+
+```powershell
+python -m scripts.evaluate_memory_extractor
+python -m scripts.test_memory_extractor_evaluation
+```
+
+### Frozen Holdout
+
+```powershell
+python -m scripts.test_memory_extractor_holdout
+python -m scripts.evaluate_memory_extractor_holdout
+```
+
+### Evaluation Analytics
+
+```powershell
+python -m scripts.test_dashboard_evaluation_analytics
+```
+
+Successful test runs should end with messages such as:
 
 ```text
-Database service test completed successfully.
-Media manager test completed successfully.
-All story generator assertions passed.
-Dashboard dependency test completed successfully.
+Language-aware memory extractor test completed successfully.
+All provider architecture assertions passed.
+Dataset integrity, metrics and output files all passed.
+Analytics tab, frozen snapshot and governance assertions passed.
 ```
 
 ---
 
 ## Clean Demo Dataset
 
-The rebuild script creates a fully fictional and privacy-safe dataset:
+The rebuild script creates a fictional and privacy-safe demonstration dataset:
 
 - **1** storyteller;
 - **1** autobiography project;
@@ -258,44 +525,63 @@ The script backs up the current local database and upload directory before rebui
 
 ---
 
-## Product and AI Boundaries
+## Privacy, Accuracy and Human Review
 
-The current implementation uses a transparent, deterministic template generator rather than a hidden production model.
+Oral autobiographies may include names, faces, voices, relationships, locations and sensitive memories. The public prototype therefore applies these controls:
 
-This choice makes the prototype:
+- local-first storage;
+- fictional public-demo data;
+- no automatic factual approval;
+- human confirmation before saving extracted events;
+- review statuses for generated content;
+- visible AI-assistance notices;
+- links between generated content and source records where available;
+- no active external LLM provider;
+- no claim that generated scenes are historical evidence.
 
-- runnable without API keys;
-- easy to test locally;
-- honest about its current AI maturity;
-- suitable for demonstrating product workflow and system design.
+A production implementation would additionally require:
 
-Potential future integrations include:
-
-- speech-to-text transcription;
-- named-entity and event extraction;
-- multilingual biography generation;
-- retrieval-grounded historical context;
-- optional LLM-assisted rewriting;
-- document export;
-- cloud storage with authentication;
-- consent and data-deletion workflows.
+- authentication and role-based access;
+- encryption at rest and in transit;
+- informed consent;
+- secure deletion and export;
+- audit logs;
+- retention policies;
+- copyright and portrait-right review;
+- stronger provenance and factual-verification workflows.
 
 ---
 
-## Privacy, Accuracy and Ethics
+## Product and AI Boundaries
 
-Oral autobiographies may include names, faces, voices, family relationships, locations and sensitive memories. A production implementation would require:
+The current implementation combines:
 
-- informed consent;
-- authentication and access control;
-- encrypted storage;
-- secure deletion and data export;
-- clear AI-generated content labels;
-- copyright and portrait-right review;
-- links between generated statements and source materials;
-- human factual approval.
+- deterministic rule-based extraction;
+- local structured-data workflows;
+- template-based content generation;
+- human review.
 
-This public repository uses fictional demo records and excludes local uploads and database files from version control.
+This design keeps the prototype:
+
+- runnable without API keys;
+- explainable;
+- testable;
+- privacy-aware;
+- appropriate for a public portfolio.
+
+Potential future work includes:
+
+- speech-to-text transcription;
+- photo metadata extraction;
+- multilingual entity extraction;
+- retrieval-grounded historical context;
+- document export;
+- role-based permissions;
+- consent and deletion workflows;
+- optional LLM-assisted rewriting;
+- a new development benchmark for future rule versions.
+
+The frozen holdout set will not be reused for future tuning.
 
 ---
 
@@ -306,40 +592,57 @@ My primary role in the original university project was **Project Coordinator and
 My contributions included:
 
 - translating business ideas into functional and technical requirements;
-- communicating technical feasibility and limitations back to commercial participants;
-- supporting cross-functional coordination and scope prioritisation;
+- communicating feasibility and limitations to commercial participants;
+- supporting scope prioritisation and cross-functional coordination;
 - participating in selected frontend workflows;
-- contributing to basic database-related implementation and discussions;
+- contributing to basic database implementation and discussion;
 - reviewing whether AI-assisted outputs matched the intended user experience.
 
-I do **not** claim to have independently trained the original Transformer models or developed the entire original system.
+I do **not** claim to have independently trained the original Transformer models or built the original system alone.
 
-For this public portfolio reconstruction, I implemented the Streamlit prototype, SQLite workflow, media-management service, template-based content generator, documentation and test scripts.
+For this public portfolio reconstruction, I independently implemented:
 
-More detail is available in [`docs/role_and_contributions.md`](docs/role_and_contributions.md).
+- the Streamlit prototype;
+- SQLite data workflows;
+- media-management service;
+- bilingual memory extraction;
+- provider architecture;
+- human-review workflow;
+- evaluation benchmarks;
+- error analysis;
+- frozen holdout protocol;
+- Analytics dashboard;
+- documentation and regression tests.
+
+More detail is available in:
+
+[`docs/role_and_contributions.md`](docs/role_and_contributions.md)
 
 ---
 
 ## Interview Summary
 
-A concise explanation of the project:
-
-> I reconstructed a privacy-safe prototype of an AI-assisted oral autobiography platform using Streamlit, SQLite and Python. The system accepts text, photo and audio materials, organises them into structured life events, generates editable biography chapters and scene/storyboard drafts, and stores each output within a human review workflow. My original team role focused on product–technical coordination, while this repository demonstrates my independent ability to translate the concept into a runnable prototype.
+> I reconstructed a privacy-aware oral-autobiography platform using Python, Streamlit and SQLite. The system organises text, photo and audio materials, extracts bilingual life-event fields into a human-review workflow, and generates editable biography and scene drafts. I built a 24-case development benchmark for error analysis, froze the rules, and then ran a one-shot evaluation on 20 unseen fictional cases, achieving 91% core-field micro accuracy and 55% complete-record accuracy. The evaluation showed that years generalised well, while title compression and location boundaries still required human review.
 
 ---
 
 ## Limitations
 
+- All benchmark and demonstration records are fictional.
+- The development benchmark contains only 24 cases.
+- The frozen holdout contains only 20 cases.
+- Strict string matching can mark semantically similar titles as incorrect.
 - Audio files are stored but not automatically transcribed.
 - Photo content is not automatically interpreted.
 - Story generation is template-based.
 - Historical facts are not automatically verified.
-- The prototype is local and does not include production authentication.
+- The prototype does not include production authentication.
+- No production user study has been conducted.
 - Video prompts are generated, but no video is rendered.
-- Editing and deletion functions are intentionally limited in Version 1.
+- The frozen holdout cannot be reused for future rule tuning.
 
 ---
 
 ## Disclaimer
 
-All demo names, memories, photographs and recordings in this repository are fictional. Generated scene descriptions are interpretative drafts and must not be treated as authentic historical evidence.
+All names, memories, photographs and recordings used in the public repository are fictional. Generated text and scene descriptions are interpretative drafts and must not be treated as verified historical evidence.
