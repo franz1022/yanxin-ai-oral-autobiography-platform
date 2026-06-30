@@ -79,6 +79,90 @@ def main() -> None:
     assert "未识别到明确年份。" in chinese_unknown_result.warnings
     assert chinese_unknown_result.people_involved == "讲述者和母亲"
 
+
+    # Regression checks added after benchmark error analysis.
+    chinese_wedding = extract_memory(
+        "1990年，我和妻子在深圳举行婚礼。家人和朋友都很开心。"
+    )
+    assert chinese_wedding.location == "深圳"
+    assert chinese_wedding.event_title == "结婚与家庭"
+
+    chinese_birth = extract_memory(
+        "1948年，我出生在广东，和父母住在一起。那段早年生活很平静。"
+    )
+    assert chinese_birth.location == "广东"
+
+    chinese_courtyard = extract_memory(
+        "我常常和母亲坐在老家的院子里聊天，那是一段温暖的回忆。"
+    )
+    assert chinese_courtyard.location == "老家的院子"
+    assert chinese_courtyard.event_title == "在院子里与母亲聊天"
+
+    chinese_graduation = extract_memory(
+        "2001年，我在北京生活，和朋友一起庆祝毕业，我们非常开心。"
+    )
+    assert chinese_graduation.event_title == "庆祝毕业"
+
+    chinese_loss = extract_memory(
+        "1998年，我在上海工作，父亲离开了我们，我感到非常悲伤。"
+    )
+    assert chinese_loss.event_title == "父亲离世"
+
+    chinese_study = extract_memory(
+        "从1966年到1968年，我在广州学习，和同学一起度过了艰难的日子。"
+    )
+    assert chinese_study.location == "广州"
+    assert chinese_study.event_title == "在广州求学"
+
+    chinese_window = extract_memory(
+        "1995年，我和母亲坐在厨房窗边，安静地回忆童年。"
+    )
+    assert chinese_window.location == "厨房窗边"
+    assert chinese_window.event_title == "窗边回忆"
+
+    english_migration = extract_memory(
+        "Around 1976, I moved from Guangzhou to Shenzhen with my mother. "
+        "Life was difficult, but we were hopeful about the new beginning."
+    )
+    assert english_migration.location == "Guangzhou → Shenzhen"
+    assert english_migration.event_title == "Moving to Shenzhen"
+
+    english_nested_location = extract_memory(
+        "In 1990, I married my wife at a fictional community hall in "
+        "Shenzhen. Our friends celebrated happily."
+    )
+    assert english_nested_location.location == "Shenzhen"
+
+    english_courtyard = extract_memory(
+        "I often sat with my mother in the family courtyard and remembered "
+        "our childhood warmly."
+    )
+    assert english_courtyard.location == "the family courtyard"
+    assert (
+        english_courtyard.event_title
+        == "Conversations in the Family Courtyard"
+    )
+
+    english_graduation = extract_memory(
+        "In 2001, I lived in Beijing with my friends and celebrated "
+        "graduation happily."
+    )
+    assert english_graduation.event_title == "Celebrating Graduation"
+
+    english_study = extract_memory(
+        "Between 1966 and 1968, I studied at a school in Guangzhou with "
+        "my classmates during a difficult period."
+    )
+    assert english_study.location == "Guangzhou"
+    assert english_study.event_title == "Studying in Guangzhou"
+
+    english_window = extract_memory(
+        "In 1995, I sat near the kitchen window with my mother and "
+        "remembered childhood."
+    )
+    assert english_window.location == "the kitchen window"
+    assert english_window.event_title == "Memories by the Kitchen Window"
+
     payload = create_life_event_payload(
         chinese_result,
         project_id=7,

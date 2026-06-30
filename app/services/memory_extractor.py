@@ -86,14 +86,31 @@ def _extract_year_range(
 
 
 def _clean_extracted_phrase(value: str) -> str:
+    """Trim common narrative continuations from an English location phrase."""
     value = normalise_text(value)
     value = re.split(
-        r"\b(?:with|while|when|where|who|because|and then)\b",
+        r"\b(?:with|while|when|where|who|because|during|and then)\b"
+        r"|\band\s+(?:remembered|recalled|celebrated|felt|worked|studied|"
+        r"lived|sat|walked)\b",
         value,
         maxsplit=1,
         flags=re.IGNORECASE,
     )[0]
     return value.strip(" ,.;:-")
+
+
+def _clean_chinese_location(value: str) -> str:
+    """Keep the place name while removing trailing actions and particles."""
+    value = normalise_text(value)
+    value = re.split(
+        r"(?:举行婚礼|举行|生活|工作|学习|上学|出生|长大|度过|居住|"
+        r"结婚|里聊天|聊天|回忆|玩耍|散步|读书|求学|住下)",
+        value,
+        maxsplit=1,
+    )[0]
+    value = value.strip(" ，。；！？,:;")
+    value = re.sub(r"(院子|房间|屋子)里$", r"\1", value)
+    return value
 
 
 def _extract_location(
@@ -103,30 +120,56 @@ def _extract_location(
     if location_hint and location_hint.strip():
         return normalise_text(location_hint), "high"
 
+    # Migration paths are kept as origin → destination because both places
+    # are useful for a reviewed life-event record.
     migration_cn = re.search(
-        r"从\s*([^，。；！？]{1,20}?)\s*(?:搬到|迁到|迁往|来到|去了)\s*"
-        r"([^，。；！？]{1,20})",
+        r"从\s*([^，。；！？]{1,24}?)\s*(?:搬到|迁到|迁往|来到|去了)\s*"
+        r"([^，。；！？]{1,30})",
         text,
     )
     if migration_cn:
-        origin = normalise_text(migration_cn.group(1))
-        destination = normalise_text(migration_cn.group(2))
-        return f"{origin} → {destination}", "medium"
+        origin = _clean_chinese_location(migration_cn.group(1))
+        destination = _clean_chinese_location(migration_cn.group(2))
+        if origin and destination:
+            return f"{origin} → {destination}", "medium"
+
+    migration_en = re.search(
+        r"\b(?:moved|relocated|migrated)\s+from\s+"
+        r"([^,.!?;]{1,60}?)\s+to\s+([^,.!?;]{1,60}?)"
+        r"(?=\s+(?:with|while|when|because|and)\b|[,.!?;]|$)",
+        text,
+        flags=re.IGNORECASE,
+    )
+    if migration_en:
+        origin = _clean_extracted_phrase(migration_en.group(1))
+        destination = _clean_extracted_phrase(migration_en.group(2))
+        if origin and destination:
+            return f"{origin} → {destination}", "medium"
 
     destination_cn = re.search(
-        r"(?:搬到|迁到|迁往|来到|去了)\s*([^，。；！？]{1,24})",
+        r"(?:搬到|迁到|迁往|来到|去了)\s*([^，。；！？]{1,30})",
         text,
     )
     if destination_cn:
-        return normalise_text(destination_cn.group(1)), "medium"
+        candidate = _clean_chinese_location(destination_cn.group(1))
+        if candidate:
+            return candidate, "medium"
 
-    cn_matches = re.findall(
-        r"在\s*([^，。；！？]{2,30}?)"
-        r"(?:生活|工作|学习|上学|出生|长大|度过|居住|，|。)",
-        text,
+    # Prefer explicit Chinese place constructions. The look-ahead prevents
+    # narrative actions such as “举行婚礼” or “里聊天” entering the value.
+    cn_patterns = (
+        r"出生在\s*([^，。；！？]{1,30}?)(?=，|。|；|！|？|$)",
+        r"(?:坐|站|停留|住)?在\s*([^，。；！？]{1,30}?)"
+        r"(?=举行婚礼|生活|工作|学习|上学|出生|长大|度过|居住|"
+        r"里聊天|聊天|回忆|，|。|；|！|？|$)",
     )
-    if cn_matches:
-        return normalise_text(cn_matches[-1]), "medium"
+    excluded_cn = {"一起", "这里", "那里", "当时"}
+
+    for pattern in cn_patterns:
+        for match in re.finditer(pattern, text):
+            candidate = _clean_chinese_location(match.group(1))
+            if candidate and candidate not in excluded_cn:
+                return candidate, "medium"
 
     temporal_starts = (
         "the summer",
@@ -143,12 +186,14 @@ def _extract_location(
         "20",
     )
 
-    english_candidates: list[tuple[int, str]] = []
+    english_candidates: list[tuple[int, int, str]] = []
 
-    for match in re.finditer(
-        r"\b(in|at|near|beside)\s+([^,.!?;]{2,80})",
-        text,
-        flags=re.IGNORECASE,
+    for match_index, match in enumerate(
+        re.finditer(
+            r"\b(in|at|near|beside)\s+([^,.!?;]{2,100})",
+            text,
+            flags=re.IGNORECASE,
+        )
     ):
         preposition = match.group(1).lower()
         candidate = _clean_extracted_phrase(match.group(2))
@@ -161,22 +206,32 @@ def _extract_location(
             continue
 
         priority = {
-            "in": 3,
-            "at": 2,
-            "near": 1,
-            "beside": 0,
+            "in": 5,
+            "at": 4,
+            "near": 3,
+            "beside": 2,
         }[preposition]
-        english_candidates.append((priority, candidate))
 
-        nested_in = re.search(r"\bin\s+(.+)$", candidate, flags=re.IGNORECASE)
-        if nested_in:
-            nested_candidate = _clean_extracted_phrase(nested_in.group(1))
+        # Phrases such as “a school in Guangzhou” or “a fictional village
+        # in Guangdong” contain a more useful nested geographic location.
+        nested_matches = list(
+            re.finditer(r"\bin\s+(.+)$", candidate, flags=re.IGNORECASE)
+        )
+        if nested_matches:
+            nested_candidate = _clean_extracted_phrase(
+                nested_matches[-1].group(1)
+            )
             if nested_candidate:
-                english_candidates.append((3, nested_candidate))
+                english_candidates.append(
+                    (priority + 10, -match_index, nested_candidate)
+                )
+
+        if candidate:
+            english_candidates.append((priority, -match_index, candidate))
 
     if english_candidates:
-        english_candidates.sort(key=lambda item: item[0], reverse=True)
-        return english_candidates[0][1], "medium"
+        english_candidates.sort(reverse=True)
+        return english_candidates[0][2], "medium"
 
     return None, "low"
 
@@ -344,7 +399,7 @@ def _extract_title(
             return "Walking to Primary School", "high"
         return "Walking to School", "high"
 
-    if any(word in lower_text for word in ("moved", "move to", "relocated")) or any(
+    if any(word in lower_text for word in ("moved", "move to", "relocated", "migrated")) or any(
         word in text for word in ("搬到", "迁到", "迁往", "来到")
     ):
         if location and "→" in location:
@@ -378,6 +433,54 @@ def _extract_title(
             "出生与早年家庭" if language == "zh" else "Birth and Early Family",
             "high",
         )
+
+    # Common autobiographical event types are normalised to short,
+    # review-friendly titles rather than copying the whole first sentence.
+    if (
+        ("院子" in text and "聊天" in text)
+        or ("courtyard" in lower_text and any(
+            word in lower_text for word in ("sat", "talked", "conversation")
+        ))
+    ):
+        if language == "zh":
+            if "母亲" in text or "妈妈" in text:
+                return "在院子里与母亲聊天", "high"
+            return "在院子里聊天", "medium"
+        return "Conversations in the Family Courtyard", "high"
+
+    if "毕业" in text and any(word in text for word in ("庆祝", "开心", "快乐")):
+        return "庆祝毕业", "high"
+    if "graduation" in lower_text and any(
+        word in lower_text for word in ("celebrated", "celebrating", "happy")
+    ):
+        return "Celebrating Graduation", "high"
+
+    if any(word in text for word in ("父亲离开了我们", "父亲离世", "父亲去世")):
+        return "父亲离世", "high"
+    if any(
+        phrase in lower_text
+        for phrase in ("father's loss", "father passed away", "loss of my father")
+    ):
+        return "Remembering My Father", "high"
+
+    if "窗边" in text and "回忆" in text:
+        return "窗边回忆", "high"
+    if "window" in lower_text and any(
+        word in lower_text for word in ("remembered", "recalled", "memory")
+    ):
+        if "kitchen window" in lower_text:
+            return "Memories by the Kitchen Window", "high"
+        return "Memories by the Window", "medium"
+
+    if any(word in text for word in ("学习", "求学", "上学")) and location:
+        return f"在{location}求学", "high"
+    if any(word in lower_text for word in ("studied", "studying")) and location:
+        return f"Studying in {location}", "high"
+
+    if ("童年" in text or "小时候" in text) and location:
+        return f"{location}的童年", "high"
+    if "childhood" in lower_text and location:
+        return f"Childhood in {location}", "high"
 
     first_sentence = re.split(r"[.!?。！？]", text, maxsplit=1)[0]
 
