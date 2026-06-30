@@ -33,7 +33,11 @@ from app.services.database import (  # noqa: E402
     update_content_review_status,
 )
 from app.services.media_manager import save_uploaded_file  # noqa: E402
-from app.services.memory_extractor import extract_memory  # noqa: E402
+from app.services.memory_extraction_providers import (  # noqa: E402
+    RULE_BASED_PROVIDER_ID,
+    extract_memory_with_provider,
+    list_memory_extraction_providers,
+)
 from app.services.story_generator import (  # noqa: E402
     generate_biography,
     generate_event_content_bundle,
@@ -729,6 +733,48 @@ with tabs[3]:
             "draft and saves nothing until you confirm the fields."
         )
 
+        provider_infos = list_memory_extraction_providers()
+        provider_by_label = {
+            (
+                f"{provider.display_name_zh} / "
+                f"{provider.display_name_en}"
+            ): provider
+            for provider in provider_infos
+        }
+
+        default_provider_label = next(
+            label
+            for label, provider in provider_by_label.items()
+            if provider.provider_id == RULE_BASED_PROVIDER_ID
+        )
+
+        def clear_memory_extraction_draft_on_provider_change() -> None:
+            """Clear stale review state when the extraction provider changes."""
+            st.session_state.pop("memory_extraction_draft", None)
+            st.session_state.pop("memory_extraction_linked_material", None)
+
+        selected_provider_label = st.selectbox(
+            "提取模式 / Extraction mode",
+            options=list(provider_by_label.keys()),
+            index=list(provider_by_label.keys()).index(
+                default_provider_label
+            ),
+            key="memory_extraction_provider_label",
+            on_change=clear_memory_extraction_draft_on_provider_change,
+        )
+        selected_provider = provider_by_label[selected_provider_label]
+
+        if selected_provider.available:
+            st.caption(
+                f"{selected_provider.description_zh} "
+                f"{selected_provider.description_en}"
+            )
+        else:
+            st.info(
+                f"{selected_provider.description_zh} "
+                f"{selected_provider.description_en}"
+            )
+
         extraction_source_text = st.text_area(
             "回忆文字 / Memory passage",
             height=170,
@@ -750,15 +796,30 @@ with tabs[3]:
             "提取可审核字段 / Extract Reviewable Fields",
             width="stretch",
             key="extract_memory_submit",
+            disabled=not selected_provider.available,
         )
 
         if extract_memory_submit:
             try:
-                extraction_result = extract_memory(
+                extraction_result = extract_memory_with_provider(
                     extraction_source_text,
+                    provider_id=selected_provider.provider_id,
+                )
+                extraction_draft_payload = extraction_result.to_dict()
+                extraction_draft_payload["provider_id"] = (
+                    selected_provider.provider_id
+                )
+                extraction_draft_payload["provider_name_en"] = (
+                    selected_provider.display_name_en
+                )
+                extraction_draft_payload["provider_name_zh"] = (
+                    selected_provider.display_name_zh
+                )
+                extraction_draft_payload["provider_sends_data_external"] = (
+                    selected_provider.sends_data_external
                 )
                 st.session_state["memory_extraction_draft"] = (
-                    extraction_result.to_dict()
+                    extraction_draft_payload
                 )
                 st.session_state["memory_extraction_linked_material"] = (
                     extraction_material_label
@@ -769,6 +830,16 @@ with tabs[3]:
         extraction_draft = st.session_state.get(
             "memory_extraction_draft"
         )
+
+        # Defensive check: never show a draft produced by a different provider.
+        if (
+            extraction_draft
+            and extraction_draft.get("provider_id")
+            != selected_provider.provider_id
+        ):
+            st.session_state.pop("memory_extraction_draft", None)
+            st.session_state.pop("memory_extraction_linked_material", None)
+            extraction_draft = None
 
         if extraction_draft:
             draft_language = extraction_draft.get(
@@ -880,6 +951,17 @@ with tabs[3]:
             }
 
             st.warning(extraction_ui["review_warning"])
+
+            provider_name = (
+                extraction_draft.get("provider_name_zh")
+                if is_chinese_draft
+                else extraction_draft.get("provider_name_en")
+            )
+            if provider_name:
+                if is_chinese_draft:
+                    st.caption(f"本次提取模式：{provider_name}")
+                else:
+                    st.caption(f"Extraction mode: {provider_name}")
 
             confidence = extraction_draft.get("field_confidence", {})
 
