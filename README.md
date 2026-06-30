@@ -85,7 +85,9 @@ The platform deliberately does **not** claim to:
 
 ![Generated content review](diagrams/screenshots/04_content_review.png)
 
+### Evaluation Analytics
 
+![Evaluation analytics](diagrams/screenshots/05_evaluation_analytics.png)
 ---
 
 ## End-to-End Product Workflow
